@@ -56,10 +56,10 @@ class Student {
   factory Student.fromMap(Map<String, dynamic> map, String docId) {
     return Student(
       id: docId,
-      adm: (map['adm'] ?? map['admissionNo'] ?? '').toString().trim(),
-      name: (map['name'] ?? '').toString().trim(),
-      studentClass: (map['class'] ?? map['studentClass'] ?? '').toString().trim(),
-      roll: int.tryParse(map['roll']?.toString() ?? '') ?? 1,
+      adm: (map['adm'] ?? map['admissionNo'] ?? map['admNo'] ?? '').toString().trim(),
+      name: (map['name'] ?? map['studentName'] ?? '').toString().trim(),
+      studentClass: (map['class'] ?? map['studentClass'] ?? map['currentClass'] ?? map['className'] ?? '').toString().trim(),
+      roll: int.tryParse((map['roll'] ?? map['rollNo'])?.toString() ?? '') ?? 1,
       gender: (map['gender'] ?? 'Male').toString(),
       mobile: (map['mobile'] ?? map['phone'] ?? '').toString().trim(),
       father: (map['father'] ?? map['fatherName'] ?? map['guardianName'] ?? '').toString().trim(),

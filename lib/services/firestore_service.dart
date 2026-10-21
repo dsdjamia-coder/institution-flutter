@@ -23,8 +23,13 @@ class FirestoreService {
   // ==================== SETTINGS ====================
   Future<InstitutionSetting> fetchSettings() async {
     try {
-      final url = Uri.parse('$baseUrl/settings/general');
-      final res = await http.get(url);
+      // Primary doc in user Firestore is settings/instituteConfig, fallback to settings/general
+      var url = Uri.parse('$baseUrl/settings/instituteConfig');
+      var res = await http.get(url);
+      if (res.statusCode != 200) {
+        url = Uri.parse('$baseUrl/settings/general');
+        res = await http.get(url);
+      }
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
         final fields = _decodeFirestoreFields(data['fields'] ?? {});
@@ -40,7 +45,7 @@ class FirestoreService {
   Future<bool> saveSettings(InstitutionSetting setting) async {
     _cachedSetting = setting;
     try {
-      final url = Uri.parse('$baseUrl/settings/general');
+      final url = Uri.parse('$baseUrl/settings/instituteConfig');
       final body = jsonEncode({
         'fields': _encodeFirestoreFields(setting.toMap()),
       });
@@ -371,6 +376,30 @@ class FirestoreService {
     } catch (e) {
       debugPrint('[FirestoreService] saveExamResult notice: $e');
       return true;
+    }
+  }
+
+  // ==================== FIREBASE AUTH ====================
+  Future<Map<String, dynamic>?> signInWithFirebaseAuth(String email, String password) async {
+    try {
+      final url = Uri.parse(AppConstants.firebaseAuthSignInUrl);
+      final body = jsonEncode({
+        'email': email,
+        'password': password,
+        'returnSecureToken': true,
+      });
+      final res = await http.post(url, body: body, headers: {'Content-Type': 'application/json'});
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body) as Map<String, dynamic>;
+      } else {
+        final err = jsonDecode(res.body);
+        final msg = err['error']?['message']?.toString() ?? 'Authentication failed';
+        debugPrint('[FirestoreService] signInWithFirebaseAuth error: $msg');
+        return {'error': msg};
+      }
+    } catch (e) {
+      debugPrint('[FirestoreService] signInWithFirebaseAuth exception: $e');
+      return {'error': e.toString()};
     }
   }
 

@@ -95,20 +95,32 @@ class InstitutionProvider extends ChangeNotifier {
       _staffList = await _firestoreService.fetchStaff();
 
       if (_classes.isEmpty) {
-        _classes = [
-          'Class 1',
-          'Class 2',
-          'Class 3',
-          'Class 4',
-          'Class 5',
-          'Class 6',
-          'Class 7',
-          'Class 8',
-          'Class 9',
-          'Class 10',
-          'Class 11',
-          'Class 12',
-        ];
+        // Derive classes dynamically from students in Firestore
+        final studentClasses = _students
+            .map((s) => s.studentClass.trim())
+            .where((c) => c.isNotEmpty && c.toLowerCase() != 'alumni')
+            .toSet()
+            .toList();
+        studentClasses.sort();
+
+        if (studentClasses.isNotEmpty) {
+          _classes = studentClasses;
+        } else {
+          _classes = [
+            'Class 1',
+            'Class 2',
+            'Class 3',
+            'Class 4',
+            'Class 5',
+            'Class 6',
+            'Class 7',
+            'Class 8',
+            'Class 9',
+            'Class 10',
+            'Class 11',
+            'Class 12',
+          ];
+        }
       }
     } catch (e) {
       debugPrint('[InstitutionProvider] init error: $e');
@@ -423,6 +435,35 @@ class InstitutionProvider extends ChangeNotifier {
   }
 
   Future<bool> loginStaff(String emailOrId, String password) async {
+    final cleanInput = emailOrId.trim();
+
+    // 1. First, attempt official Firebase Authentication via REST API
+    if (cleanInput.contains('@')) {
+      final authResult = await _firestoreService.signInWithFirebaseAuth(cleanInput, password);
+      if (authResult != null && !authResult.containsKey('error')) {
+        // Authenticated successfully via Firebase Auth
+        final isAdmin = cleanInput.toLowerCase() == _setting.email.toLowerCase() ||
+            cleanInput.toLowerCase() == 'nimdevathiyal4883@gmail.com';
+
+        final adminStaff = Staff(
+          id: authResult['localId']?.toString() ?? 'ADMIN_01',
+          name: isAdmin ? 'Administrator' : cleanInput.split('@').first,
+          role: isAdmin ? 'ADMIN' : 'STAFF',
+          designation: isAdmin ? 'HEADMASTER' : 'STAFF',
+          email: cleanInput,
+          hasAdminAccess: true,
+          hasCollectionAccess: true,
+          hasResultAccess: true,
+          hasWorksheetAccess: true,
+        );
+        _currentStaff = adminStaff;
+        _currentRole = 'super_admin';
+        notifyListeners();
+        return true;
+      }
+    }
+
+    // 2. Fallback to local staff list check
     return authenticateStaff(emailOrId, password) != null;
   }
 

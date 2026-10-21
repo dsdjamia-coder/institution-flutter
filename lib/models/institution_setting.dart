@@ -57,13 +57,13 @@ class InstitutionSetting {
 
   factory InstitutionSetting.fromMap(Map<String, dynamic> map) {
     return InstitutionSetting(
-      appName: map['appName']?.toString() ?? 'NIM Higher Secondary',
-      institutionName: map['institutionName']?.toString() ?? 'NIM HIGHER SECONDARY',
-      managementName: map['managementName']?.toString() ?? 'Muhyudheen jumma masjid Devathiyal',
+      appName: map['appName']?.toString() ?? map['name']?.toString() ?? 'NIM Higher Secondary',
+      institutionName: map['institutionName']?.toString() ?? map['name']?.toString() ?? 'NIM HIGHER SECONDARY',
+      managementName: map['managementName']?.toString() ?? map['affiliationBoard']?.toString() ?? 'Muhyudheen jumma masjid Devathiyal',
       type: map['type']?.toString() ?? 'Higher Secondary Madrasa',
       regNo: map['regNo']?.toString() ?? '4883',
       place: map['place']?.toString() ?? 'Devathiyal',
-      address: map['address']?.toString() ?? 'Devathiyal near Chelari, Malappuram, Kerala',
+      address: map['address']?.toString() ?? map['addressLine1']?.toString() ?? 'Devathiyal near Chelari, Malappuram, Kerala',
       phone: map['phone']?.toString() ?? '+91 9946 806 268',
       email: map['email']?.toString() ?? 'nimdevathiyal4883@gmail.com',
       website: map['website']?.toString() ?? '',
@@ -72,7 +72,7 @@ class InstitutionSetting {
       activeAcademicYear: map['activeAcademicYear']?.toString() ?? '2026-2027',
       aboutText: map['aboutText']?.toString() ?? 'NOORUL ISLAM HIGHER SECONDARY MADRASA, located at Devathiyal near Chelari, Malappuram, Kerala, is a well-established Islamic educational institution affiliated to the Samastha Kerala Islam Matha Vidyabhyasa Board (Register No. 4883). The institution offers classes from Grade 1 to Higher Secondary Level (Grade 12), ensuring a comprehensive Islamic education for every student.\n\nManaged by the Muhyudheen Jumma Masjid Committee, Devathiyal, the Madrasa is guided by highly qualified and experienced Ustads who are dedicated to building students with strong faith, good character, and creative potential. The institution takes pride in identifying and nurturing the unique talents of each student alongside their religious studies.\n\nThe wholehearted support of the committee and the local community continues to be the driving force behind the institution\'s progress — working together to raise a generation firmly rooted in Islamic values.',
       receiptHeader: map['receiptHeader']?.toString() ?? 'FEE RECEIPT',
-      receiptFooter: map['receiptFooter']?.toString() ?? 'Thank you for your payment.',
+      receiptFooter: map['receiptFooter']?.toString() ?? map['receiptFooterMessage']?.toString() ?? 'Thank you for your payment.',
       developerCredit: map['developerCredit']?.toString() ?? 'HADI MAHIRI FAIZY',
       versionText: map['versionText']?.toString() ?? 'v2.6.0',
       lastUpdatedText: map['lastUpdatedText']?.toString() ?? '2026-04-25',
@@ -88,13 +88,16 @@ class InstitutionSetting {
 
   Map<String, dynamic> toMap() {
     return {
+      'name': institutionName,
       'appName': appName,
       'institutionName': institutionName,
       'managementName': managementName,
+      'affiliationBoard': managementName,
       'type': type,
       'regNo': regNo,
       'place': place,
       'address': address,
+      'addressLine1': address,
       'phone': phone,
       'email': email,
       'website': website,
@@ -104,6 +107,7 @@ class InstitutionSetting {
       'aboutText': aboutText,
       'receiptHeader': receiptHeader,
       'receiptFooter': receiptFooter,
+      'receiptFooterMessage': receiptFooter,
       'developerCredit': developerCredit,
       'versionText': versionText,
       'lastUpdatedText': lastUpdatedText,

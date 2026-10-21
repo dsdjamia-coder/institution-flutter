@@ -21,28 +21,25 @@ class SecureLoginModal extends StatefulWidget {
 }
 
 class _SecureLoginModalState extends State<SecureLoginModal> {
-  bool _isStaffMode = false;
-  bool _obscurePassword = true;
-
-  // Student mode state
+  // Selected class determines mode:
+  // - If null / empty: Staff / Admin mode (Username or Email + Password)
+  // - If selected: Student / Alumni mode (Search Name/Adm + Mobile Number)
   String? _selectedClass;
   Student? _selectedStudent;
-  final TextEditingController _studentSearchController = TextEditingController();
-  final TextEditingController _studentPasswordController = TextEditingController();
+  bool _obscurePassword = true;
 
-  // Staff mode state
-  final TextEditingController _staffEmailController = TextEditingController();
-  final TextEditingController _staffPasswordController = TextEditingController();
+  final TextEditingController _identifierController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
 
   String? _errorMessage;
   bool _isLoading = false;
 
+  bool get _isStudentMode => _selectedClass != null && _selectedClass!.isNotEmpty;
+
   @override
   void dispose() {
-    _studentSearchController.dispose();
-    _studentPasswordController.dispose();
-    _staffEmailController.dispose();
-    _staffPasswordController.dispose();
+    _identifierController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -55,27 +52,40 @@ class _SecureLoginModalState extends State<SecureLoginModal> {
     final provider = context.read<InstitutionProvider>();
 
     try {
-      if (!_isStaffMode) {
-        // Student Login
-        final query = _studentSearchController.text.trim();
-        final password = _studentPasswordController.text.trim();
+      if (_isStudentMode) {
+        // ==================== STUDENT LOGIN ====================
+        final query = _identifierController.text.trim();
+        final password = _passwordController.text.trim();
 
-        if (_selectedStudent == null && query.isEmpty) {
+        if (query.isEmpty) {
           setState(() {
-            _errorMessage = 'Please select or search your name / Adm No.';
+            _errorMessage = 'Please enter student Name or Admission No.';
             _isLoading = false;
           });
           return;
         }
 
-        // Try to find student if not selected from suggestions
+        if (password.isEmpty) {
+          setState(() {
+            _errorMessage = 'Please enter registered mobile number as password.';
+            _isLoading = false;
+          });
+          return;
+        }
+
+        // Search student matching class and query (Adm or Name)
+        final cleanPhone = password.replaceAll(RegExp(r'\D'), '').trim();
+        final isAlumni = _selectedClass == 'Alumni';
+
         Student? student = _selectedStudent;
         if (student == null) {
           final matched = provider.students.where((s) {
-            final matchesClass = _selectedClass == null || _selectedClass!.isEmpty || s.studentClass == _selectedClass;
-            final matchesQuery = s.adm.toLowerCase() == query.toLowerCase() ||
+            final classMatch = isAlumni
+                ? (s.status.toLowerCase() == 'alumni' || s.studentClass.toLowerCase() == 'alumni')
+                : (s.studentClass.toLowerCase() == _selectedClass!.toLowerCase());
+            final queryMatch = s.adm.toLowerCase() == query.toLowerCase() ||
                 s.name.toLowerCase().contains(query.toLowerCase());
-            return matchesClass && matchesQuery;
+            return classMatch && queryMatch;
           }).toList();
 
           if (matched.isNotEmpty) {
@@ -84,24 +94,21 @@ class _SecureLoginModalState extends State<SecureLoginModal> {
         }
 
         if (student == null) {
-          // If Firestore is empty, allow a demo student login so user can preview the student portal
-          if (provider.students.isEmpty) {
-            student = Student(
-              id: 'demo-student-1',
-              adm: query.isNotEmpty ? query : '4883',
-              name: query.isNotEmpty ? query : 'Student Preview',
-              studentClass: _selectedClass ?? 'Class 10',
-              mobile: password.isNotEmpty ? password : '9946806268',
-              gender: 'Male',
-              father: 'Father Name',
-            );
-          } else {
-            setState(() {
-              _errorMessage = 'Student not found. Please verify details.';
-              _isLoading = false;
-            });
-            return;
-          }
+          setState(() {
+            _errorMessage = 'No student found in $_selectedClass matching "$query".';
+            _isLoading = false;
+          });
+          return;
+        }
+
+        // Verify password against student's registered mobile number
+        final studentPhone = student.mobile.replaceAll(RegExp(r'\D'), '').trim();
+        if (studentPhone.isNotEmpty && cleanPhone != studentPhone) {
+          setState(() {
+            _errorMessage = 'Incorrect mobile number password. Please verify.';
+            _isLoading = false;
+          });
+          return;
         }
 
         provider.loginStudent(student);
@@ -113,19 +120,19 @@ class _SecureLoginModalState extends State<SecureLoginModal> {
           );
         }
       } else {
-        // Staff Login
-        final email = _staffEmailController.text.trim();
-        final password = _staffPasswordController.text.trim();
+        // ==================== STAFF / ADMIN LOGIN ====================
+        final identifier = _identifierController.text.trim();
+        final password = _passwordController.text.trim();
 
-        if (email.isEmpty) {
+        if (identifier.isEmpty || password.isEmpty) {
           setState(() {
-            _errorMessage = 'Please enter your Admin/Staff email or phone.';
+            _errorMessage = 'Please enter Admin / Staff email and password.';
             _isLoading = false;
           });
           return;
         }
 
-        final success = await provider.loginStaff(email, password);
+        final success = await provider.loginStaff(identifier, password);
         if (success && mounted) {
           Navigator.pop(context);
           Navigator.push(
@@ -150,14 +157,14 @@ class _SecureLoginModalState extends State<SecureLoginModal> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<InstitutionProvider>();
-    final classes = ['All Classes', ...provider.classes, 'Alumni'];
+    final classes = ['Select Class', ...provider.classes, 'Alumni'];
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
       backgroundColor: Colors.white,
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       child: Container(
-        width: 360,
+        width: 380,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: SingleChildScrollView(
           child: Column(
@@ -179,221 +186,204 @@ class _SecureLoginModalState extends State<SecureLoginModal> {
 
               // Blue Lock Badge at Top Center
               Container(
-                width: 50,
-                height: 50,
+                width: 52,
+                height: 52,
                 decoration: BoxDecoration(
                   color: const Color(0xFFEFF6FF),
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: const Color(0xFFDBEAFE)),
                 ),
-                child: const Icon(
-                  Icons.lock_rounded,
-                  color: Color(0xFF2563EB),
-                  size: 26,
+                child: Icon(
+                  _isStudentMode ? Icons.school_rounded : Icons.admin_panel_settings_rounded,
+                  color: const Color(0xFF2563EB),
+                  size: 28,
                 ),
               ),
               const SizedBox(height: 14),
 
               // Title: Secure Login
-              const Text(
-                'Secure Login',
-                style: TextStyle(
-                  fontSize: 20,
+              Text(
+                _isStudentMode
+                    ? (_selectedClass == 'Alumni' ? 'Alumni Portal Login' : 'Student Login (${_selectedClass!})')
+                    : 'Staff & Admin Login',
+                style: const TextStyle(
+                  fontSize: 18,
                   fontWeight: FontWeight.w800,
                   color: Color(0xFF0F172A),
                 ),
+                textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
 
-              // Mode toggle: Student Login / Staff Login
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  ChoiceChip(
-                    label: const Text('Student Login', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                    selected: !_isStaffMode,
-                    selectedColor: const Color(0xFFEFF6FF),
-                    labelStyle: TextStyle(color: !_isStaffMode ? const Color(0xFF2563EB) : const Color(0xFF64748B)),
-                    onSelected: (val) {
-                      setState(() {
-                        _isStaffMode = false;
-                        _errorMessage = null;
-                      });
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  ChoiceChip(
-                    label: const Text('Admin / Staff', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                    selected: _isStaffMode,
-                    selectedColor: const Color(0xFFEFF6FF),
-                    labelStyle: TextStyle(color: _isStaffMode ? const Color(0xFF2563EB) : const Color(0xFF64748B)),
-                    onSelected: (val) {
-                      setState(() {
-                        _isStaffMode = true;
-                        _errorMessage = null;
-                      });
-                    },
-                  ),
-                ],
+              // Subtitle hint explaining single login mechanism
+              Text(
+                _isStudentMode
+                    ? 'Enter name or admission number with registered mobile number'
+                    : 'Select class for student login, or enter credentials for admin/staff',
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  color: Color(0xFF64748B),
+                ),
+                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 18),
 
-              // Form fields based on mode
-              if (!_isStaffMode) ...[
-                // Select Class Dropdown
-                Container(
-                  height: 48,
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
+              // 1. Unified Select Class Dropdown
+              Container(
+                height: 48,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _isStudentMode ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0),
+                    width: _isStudentMode ? 1.5 : 1.0,
                   ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      isExpanded: true,
-                      value: _selectedClass,
-                      hint: const Text('Select Class', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
-                      icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF64748B)),
-                      items: classes.map((c) {
-                        return DropdownMenuItem(
-                          value: c == 'All Classes' ? null : c,
-                          child: Text(c, style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A))),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    isExpanded: true,
+                    value: _selectedClass,
+                    hint: const Row(
+                      children: [
+                        Icon(Icons.filter_list_rounded, size: 16, color: Color(0xFF64748B)),
+                        SizedBox(width: 8),
+                        Text(
+                          'Select Class (Leave blank for Admin)',
+                          style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
+                    icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF64748B)),
+                    items: classes.map((c) {
+                      return DropdownMenuItem<String>(
+                        value: c == 'Select Class' ? null : c,
+                        child: Row(
+                          children: [
+                            Icon(
+                              c == 'Select Class'
+                                  ? Icons.clear_rounded
+                                  : (c == 'Alumni' ? Icons.history_edu_rounded : Icons.class_rounded),
+                              size: 16,
+                              color: c == 'Alumni' ? const Color(0xFFF59E0B) : const Color(0xFF2563EB),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              c,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: c == 'Select Class' ? FontWeight.normal : FontWeight.bold,
+                                color: const Color(0xFF0F172A),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      setState(() {
+                        _selectedClass = val;
+                        _selectedStudent = null;
+                        _errorMessage = null;
+                      });
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // 2. Dynamic Identifier Input Field
+              Container(
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: TextField(
+                  controller: _identifierController,
+                  style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
+                  decoration: InputDecoration(
+                    prefixIcon: Icon(
+                      _isStudentMode ? Icons.badge_outlined : Icons.email_outlined,
+                      size: 18,
+                      color: const Color(0xFF64748B),
+                    ),
+                    hintText: _isStudentMode ? 'Search Name or Adm No' : 'Email (e.g. nimdevathiyal4883@gmail.com)',
+                    hintStyle: const TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8)),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // 3. Dynamic Password Input Field
+              Container(
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: TextField(
+                  controller: _passwordController,
+                  obscureText: _obscurePassword,
+                  keyboardType: _isStudentMode ? TextInputType.phone : TextInputType.text,
+                  style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
+                  decoration: InputDecoration(
+                    prefixIcon: Icon(
+                      _isStudentMode ? Icons.phone_android_rounded : Icons.lock_outline_rounded,
+                      size: 18,
+                      color: const Color(0xFF64748B),
+                    ),
+                    hintText: _isStudentMode ? 'Password (Registered Mobile)' : 'Password',
+                    hintStyle: const TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8)),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                        color: const Color(0xFF94A3B8),
+                        size: 18,
+                      ),
+                      onPressed: () {
                         setState(() {
-                          _selectedClass = val;
-                          _selectedStudent = null;
+                          _obscurePassword = !_obscurePassword;
                         });
                       },
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
-
-                // Search Name or Adm No input
-                Container(
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: TextField(
-                    controller: _studentSearchController,
-                    style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
-                    decoration: const InputDecoration(
-                      hintText: 'Search Name or Adm No',
-                      hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Password (Mobile Number) input with eye icon
-                Container(
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: TextField(
-                    controller: _studentPasswordController,
-                    obscureText: _obscurePassword,
-                    keyboardType: TextInputType.phone,
-                    style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
-                    decoration: InputDecoration(
-                      hintText: 'Password (Mobile Number)',
-                      hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                          color: const Color(0xFF94A3B8),
-                          size: 18,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _obscurePassword = !_obscurePassword;
-                          });
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-              ] else ...[
-                // Staff Email / Phone
-                Container(
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: TextField(
-                    controller: _staffEmailController,
-                    style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
-                    decoration: const InputDecoration(
-                      hintText: 'Email (Admin / Staff)',
-                      hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Staff Password with eye icon
-                Container(
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: TextField(
-                    controller: _staffPasswordController,
-                    obscureText: _obscurePassword,
-                    style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
-                    decoration: InputDecoration(
-                      hintText: 'Password',
-                      hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                          color: const Color(0xFF94A3B8),
-                          size: 18,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _obscurePassword = !_obscurePassword;
-                          });
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              ),
 
               // Error message
               if (_errorMessage != null) ...[
-                const SizedBox(height: 10),
-                Text(
-                  _errorMessage!,
-                  style: const TextStyle(color: Colors.red, fontSize: 11, fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center,
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFFECACA)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.error_outline_rounded, size: 16, color: Colors.red),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _errorMessage!,
+                          style: const TextStyle(color: Color(0xFFDC2626), fontSize: 11.5, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
-              const SizedBox(height: 18),
+              const SizedBox(height: 20),
 
-              // Large Dark Navy Button: ➔ Login Securely
+              // Large Navy Action Button
               SizedBox(
                 width: double.infinity,
                 height: 48,
@@ -407,7 +397,9 @@ class _SecureLoginModalState extends State<SecureLoginModal> {
                         )
                       : const Icon(Icons.login_rounded, size: 18),
                   label: Text(
-                    _isLoading ? 'Authenticating...' : 'Login Securely',
+                    _isLoading
+                        ? 'Authenticating...'
+                        : (_isStudentMode ? 'Login as Student' : 'Login as Staff / Admin'),
                     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                   ),
                   style: ElevatedButton.styleFrom(

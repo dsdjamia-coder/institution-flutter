@@ -41,52 +41,14 @@ class _PublicScreenState extends State<PublicScreen> {
     final provider = context.watch<InstitutionProvider>();
     final setting = provider.setting;
 
-    // Faculty members (use provider staff or screenshot defaults)
-    final teachers = provider.staffList.isNotEmpty
-        ? provider.staffList
-        : [
-            Staff(
-              id: 'ustad-1',
-              name: 'Muhammad Anas Faizy T',
-              role: 'TEACHER',
-              designation: 'SWADAR',
-              phone: '+91 9946 806 268',
-              place: 'Devathiyal',
-            ),
-            Staff(
-              id: 'ustad-2',
-              name: 'Moideen Kottkuth',
-              role: 'TEACHER',
-              designation: 'TEACHER',
-              phone: '+91 9946 806 268',
-              place: 'Devathiyal',
-            ),
-            Staff(
-              id: 'ustad-3',
-              name: 'Shahul Hameed Rahmani',
-              role: 'TEACHER',
-              designation: 'TEACHER',
-              phone: '+91 9946 806 268',
-              place: 'Devathiyal',
-            ),
-          ];
+    // Faculty members directly from Firestore
+    final teachers = provider.staffList;
 
-    // Compute metrics
-    final totalStudents = provider.totalStudents > 0
-        ? provider.totalStudents.toString()
-        : setting.defaultStudentsCount.toString();
-
-    final totalTeachers = provider.totalStaff > 0
-        ? provider.totalStaff.toString()
-        : setting.defaultTeachersCount.toString();
-
-    final maleCount = provider.totalStudents > 0
-        ? provider.students.where((s) => s.gender.toLowerCase() == 'male').length.toString()
-        : setting.defaultMaleCount.toString();
-
-    final femaleCount = provider.totalStudents > 0
-        ? provider.students.where((s) => s.gender.toLowerCase() == 'female').length.toString()
-        : setting.defaultFemaleCount.toString();
+    // Compute metrics directly from database
+    final totalStudents = provider.totalStudents.toString();
+    final totalTeachers = provider.totalStaff.toString();
+    final maleCount = provider.students.where((s) => s.gender.toLowerCase() == 'male').length.toString();
+    final femaleCount = provider.students.where((s) => s.gender.toLowerCase() == 'female').length.toString();
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -532,18 +494,28 @@ class _PublicScreenState extends State<PublicScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  SizedBox(
-                    height: 195,
-                    child: ListView.separated(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      scrollDirection: Axis.horizontal,
-                      itemCount: teachers.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 14),
-                      itemBuilder: (ctx, index) {
-                        return TeacherCard(staff: teachers[index]);
-                      },
-                    ),
-                  ),
+                  teachers.isEmpty
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+                          child: const Center(
+                            child: Text(
+                              'Faculty directory will be updated from Admin portal.',
+                              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                            ),
+                          ),
+                        )
+                      : SizedBox(
+                          height: 195,
+                          child: ListView.separated(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            scrollDirection: Axis.horizontal,
+                            itemCount: teachers.length,
+                            separatorBuilder: (_, __) => const SizedBox(width: 14),
+                            itemBuilder: (ctx, index) {
+                              return TeacherCard(staff: teachers[index]);
+                            },
+                          ),
+                        ),
                 ],
               ),
             ),

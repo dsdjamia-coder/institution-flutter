@@ -4,7 +4,9 @@ class AppConstants {
   static const String projectId = 'institution-db743';
   static const String apiKey = 'AIzaSyCRlnf6B82HpYB1hPEFORF2yAkj3zMv7Xg';
   static const String firestoreBaseUrl =
-      'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/institutions/$institutionId';
+      'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents';
+  static const String firebaseAuthSignInUrl =
+      'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=$apiKey';
 
   // Default Fallbacks (100% White-Label: Overridden by Admin Settings)
   static const String defaultAppName = 'Institution Management Portal';
