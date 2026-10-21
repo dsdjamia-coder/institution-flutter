@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/institution_provider.dart';
 import '../../models/student.dart';
+import '../../widgets/layout/adaptive_portal_scaffold.dart';
 
 class WorksheetScreen extends StatefulWidget {
   const WorksheetScreen({super.key});
@@ -10,8 +11,8 @@ class WorksheetScreen extends StatefulWidget {
   State<WorksheetScreen> createState() => _WorksheetScreenState();
 }
 
-class _WorksheetScreenState extends State<WorksheetScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _WorksheetScreenState extends State<WorksheetScreen> {
+  int _currentIndex = 0;
   String _selectedClassFilter = 'ALL';
   String _studentSearchQuery = '';
   String _alumniYearFilter = 'ALL';
@@ -27,7 +28,6 @@ class _WorksheetScreenState extends State<WorksheetScreen> with SingleTickerProv
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
     _initGrid();
   }
 
@@ -39,7 +39,6 @@ class _WorksheetScreenState extends State<WorksheetScreen> with SingleTickerProv
 
   @override
   void dispose() {
-    _tabController.dispose();
     _formulaController.dispose();
     super.dispose();
   }
@@ -53,39 +52,16 @@ class _WorksheetScreenState extends State<WorksheetScreen> with SingleTickerProv
     // Distinct alumni graduation years
     final alumniYears = ['ALL', ...alumniStudents.map((a) => a.graduatedYear.isNotEmpty ? a.graduatedYear : a.academicYear).toSet()];
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 1,
-        title: const Text(
-          'Class Worksheet & Registers',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0F172A)),
-        ),
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: const Color(0xFF2563EB),
-          indicatorColor: const Color(0xFF2563EB),
-          isScrollable: true,
-          tabs: const [
-            Tab(icon: Icon(Icons.analytics_outlined, size: 18), text: 'Class Summary'),
-            Tab(icon: Icon(Icons.list_alt_rounded, size: 18), text: 'Students Register'),
-            Tab(icon: Icon(Icons.school_outlined, size: 18), text: 'Alumni Register'),
-            Tab(icon: Icon(Icons.badge_outlined, size: 18), text: 'Staff Directory'),
-            Tab(icon: Icon(Icons.grid_on_rounded, size: 18), text: 'Worksheet Canvas (Excel)'),
-          ],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          // 1. CLASS SUMMARY (Active Classes + Alumni Summary Table Below)
-          SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Active Class Summary
+    return AdaptivePortalScaffold(
+      portalTitle: 'Class Worksheet & Registers',
+      initialIndex: _currentIndex,
+      onTabChanged: (i) => setState(() => _currentIndex = i),
+      tabs: [
+        PortalTabItem(
+          id: 'summary',
+          label: 'Class Summary',
+          icon: Icons.bar_chart_rounded,
+          body:
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
@@ -233,9 +209,14 @@ class _WorksheetScreenState extends State<WorksheetScreen> with SingleTickerProv
               ],
             ),
           ),
+        ),
 
-          // 2. STUDENTS REGISTER (Active Students with Search, Filters & A4 Card List)
-          Column(
+        // 2. STUDENTS REGISTER (Active Students with Search, Filters & A4 Card List)
+        PortalTabItem(
+          id: 'register',
+          label: 'Students Register',
+          icon: Icons.format_list_bulleted_rounded,
+          body: Column(
             children: [
               Container(
                 padding: const EdgeInsets.all(14),
@@ -321,9 +302,14 @@ class _WorksheetScreenState extends State<WorksheetScreen> with SingleTickerProv
               ),
             ],
           ),
+        ),
 
-          // 3. DEDICATED ALUMNI REGISTER TAB
-          Column(
+        // 3. DEDICATED ALUMNI REGISTER TAB
+        PortalTabItem(
+          id: 'alumni',
+          label: 'Alumni Register',
+          icon: Icons.school_rounded,
+          body: Column(
             children: [
               Container(
                 padding: const EdgeInsets.all(14),
@@ -407,9 +393,14 @@ class _WorksheetScreenState extends State<WorksheetScreen> with SingleTickerProv
               ),
             ],
           ),
+        ),
 
-          // 4. STAFF DIRECTORY
-          provider.staffList.isEmpty
+        // 4. STAFF DIRECTORY
+        PortalTabItem(
+          id: 'staff',
+          label: 'Staff Directory',
+          icon: Icons.people_alt_rounded,
+          body: provider.staffList.isEmpty
               ? const Center(child: Text('No faculty or ustads registered yet.'))
               : ListView.separated(
                   padding: const EdgeInsets.all(16),
@@ -454,9 +445,14 @@ class _WorksheetScreenState extends State<WorksheetScreen> with SingleTickerProv
                     );
                   },
                 ),
+        ),
 
-          // 5. WORKSHEET CANVAS (EXCEL-LIKE MINI WORKSPACE)
-          Column(
+        // 5. WORKSHEET CANVAS (EXCEL-LIKE MINI WORKSPACE)
+        PortalTabItem(
+          id: 'canvas',
+          label: 'Worksheet Canvas (Excel)',
+          icon: Icons.table_chart_rounded,
+          body: Column(
             children: [
               // Ribbon Toolbar
               Container(
@@ -593,8 +589,8 @@ class _WorksheetScreenState extends State<WorksheetScreen> with SingleTickerProv
               ),
             ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

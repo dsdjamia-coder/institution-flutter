@@ -5,6 +5,7 @@ import '../../models/student.dart';
 import '../../models/payment.dart';
 import '../../widgets/compound_student_search.dart';
 import '../../widgets/receipt_dialog.dart';
+import '../../widgets/layout/adaptive_portal_scaffold.dart';
 
 class FeeCollectionScreen extends StatefulWidget {
   const FeeCollectionScreen({super.key});
@@ -13,8 +14,8 @@ class FeeCollectionScreen extends StatefulWidget {
   State<FeeCollectionScreen> createState() => _FeeCollectionScreenState();
 }
 
-class _FeeCollectionScreenState extends State<FeeCollectionScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _FeeCollectionScreenState extends State<FeeCollectionScreen> {
+  int _currentIndex = 0;
 
   // Selected Student
   Student? _selectedStudent;
@@ -39,18 +40,6 @@ class _FeeCollectionScreenState extends State<FeeCollectionScreen> with SingleTi
     'February-2027', 'March-2027'
   ];
 
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
   double get _calculatedTotal {
     double total = 0;
     for (final item in _feeCatalog) {
@@ -66,31 +55,17 @@ class _FeeCollectionScreenState extends State<FeeCollectionScreen> with SingleTi
     final provider = context.watch<InstitutionProvider>();
     final setting = provider.setting;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 1,
-        title: const Text(
-          'Fee Collection Counter',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0F172A)),
-        ),
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: Colors.blue.shade700,
-          indicatorColor: Colors.blue.shade700,
-          tabs: const [
-            Tab(icon: Icon(Icons.point_of_sale, size: 18), text: 'Fee Entry'),
-            Tab(icon: Icon(Icons.table_view, size: 18), text: 'Master Ledger'),
-            Tab(icon: Icon(Icons.history, size: 18), text: 'History & VOID'),
-          ],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          // TAB 1: FEE ENTRY
-          SingleChildScrollView(
+    return AdaptivePortalScaffold(
+      portalTitle: 'Fee Collection Counter',
+      initialIndex: _currentIndex,
+      onTabChanged: (i) => setState(() => _currentIndex = i),
+      tabs: [
+        // TAB 1: FEE ENTRY
+        PortalTabItem(
+          id: 'entry',
+          label: 'Fee Entry',
+          icon: Icons.point_of_sale_rounded,
+          body: SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -328,9 +303,14 @@ class _FeeCollectionScreenState extends State<FeeCollectionScreen> with SingleTi
               ],
             ),
           ),
+        ),
 
-          // TAB 2: MASTER LEDGER
-          SingleChildScrollView(
+        // TAB 2: MASTER LEDGER
+        PortalTabItem(
+          id: 'ledger',
+          label: 'Master Ledger',
+          icon: Icons.table_view_rounded,
+          body: SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             scrollDirection: Axis.horizontal,
             child: DataTable(
@@ -357,9 +337,14 @@ class _FeeCollectionScreenState extends State<FeeCollectionScreen> with SingleTi
               }).toList(),
             ),
           ),
+        ),
 
-          // TAB 3: HISTORY & VOID
-          provider.payments.isEmpty
+        // TAB 3: HISTORY & VOID
+        PortalTabItem(
+          id: 'history',
+          label: 'History & VOID',
+          icon: Icons.history_rounded,
+          body: provider.payments.isEmpty
               ? const Center(child: Text('No payment history recorded yet.'))
               : ListView.separated(
                   padding: const EdgeInsets.all(16),
@@ -450,8 +435,8 @@ class _FeeCollectionScreenState extends State<FeeCollectionScreen> with SingleTi
                     );
                   },
                 ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
