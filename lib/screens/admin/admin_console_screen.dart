@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/institution_provider.dart';
 import '../../models/student.dart';
-import '../../models/institution_setting.dart';
+import '../../models/staff.dart';
 import '../../services/duplicate_guard.dart';
 import '../../widgets/stat_card.dart';
 
@@ -38,7 +38,7 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> with SingleTick
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 6, vsync: this);
+    _tabController = TabController(length: 7, vsync: this);
 
     final provider = context.read<InstitutionProvider>();
     final s = provider.setting;
@@ -85,6 +85,113 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> with SingleTick
     super.dispose();
   }
 
+  void _showAddStaffDialog(BuildContext context) {
+    final nameCtrl = TextEditingController();
+    final desigCtrl = TextEditingController(text: 'TEACHER');
+    final phoneCtrl = TextEditingController();
+    final emailCtrl = TextEditingController();
+    final placeCtrl = TextEditingController(text: 'Devathiyal');
+    String role = 'TEACHER';
+    String? assignedClass;
+
+    final provider = context.read<InstitutionProvider>();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Add Staff Member', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: 'Staff Name *', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: desigCtrl,
+                  decoration: const InputDecoration(labelText: 'Designation (e.g. SWADAR, TEACHER) *', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  value: role,
+                  decoration: const InputDecoration(labelText: 'Role', border: OutlineInputBorder()),
+                  items: const [
+                    DropdownMenuItem(value: 'TEACHER', child: Text('Teacher / Faculty')),
+                    DropdownMenuItem(value: 'ADMIN', child: Text('Administrator')),
+                    DropdownMenuItem(value: 'OPERATOR', child: Text('Accountant / Operator')),
+                  ],
+                  onChanged: (val) => setDialogState(() => role = val!),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: phoneCtrl,
+                  decoration: const InputDecoration(labelText: 'Phone / WhatsApp', border: OutlineInputBorder()),
+                  keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: emailCtrl,
+                  decoration: const InputDecoration(labelText: 'Email Address', border: OutlineInputBorder()),
+                  keyboardType: TextInputType.emailAddress,
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: placeCtrl,
+                  decoration: const InputDecoration(labelText: 'Place / Location', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  value: assignedClass,
+                  decoration: const InputDecoration(labelText: 'Assigned Class', border: OutlineInputBorder()),
+                  items: [
+                    const DropdownMenuItem(value: null, child: Text('All Classes (General)')),
+                    ...provider.classes.map((c) => DropdownMenuItem(value: c, child: Text(c))),
+                  ],
+                  onChanged: (val) => setDialogState(() => assignedClass = val),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () async {
+                if (nameCtrl.text.trim().isEmpty) return;
+                Navigator.pop(ctx);
+                final newStaff = Staff(
+                  id: 'STF_${DateTime.now().millisecondsSinceEpoch}',
+                  name: nameCtrl.text.trim(),
+                  designation: desigCtrl.text.trim().toUpperCase(),
+                  role: role,
+                  phone: phoneCtrl.text.trim(),
+                  email: emailCtrl.text.trim(),
+                  place: placeCtrl.text.trim(),
+                  assignedClass: assignedClass ?? '',
+                  hasAdminAccess: role == 'ADMIN',
+                  hasCollectionAccess: true,
+                  hasResultAccess: true,
+                  hasWorksheetAccess: true,
+                );
+                await provider.addStaff(newStaff);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Staff member ${newStaff.name} added!')),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
+              child: const Text('Add Staff'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<InstitutionProvider>();
@@ -110,6 +217,7 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> with SingleTick
             Tab(icon: Icon(Icons.people, size: 18), text: 'Manage Students'),
             Tab(icon: Icon(Icons.class_, size: 18), text: 'Classes'),
             Tab(icon: Icon(Icons.transfer_within_a_station, size: 18), text: 'Continuity & Transfers'),
+            Tab(icon: Icon(Icons.badge, size: 18), text: 'Staff & Teachers'),
             Tab(icon: Icon(Icons.business, size: 18), text: 'Institution Settings'),
           ],
         ),
@@ -154,89 +262,81 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> with SingleTick
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('ENROLL NEW STUDENT (MANUAL ENTRY)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  const Text('ENROLL NEW STUDENT (STRICT ZERO-DUPLICATE GUARD)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                   const SizedBox(height: 16),
 
-                  // Admission No with Live Warning
                   TextField(
                     controller: _admCtrl,
                     decoration: InputDecoration(
-                      labelText: 'Admission Number (Unique) *',
-                      prefixIcon: const Icon(Icons.tag),
-                      errorText: _admWarning,
+                      labelText: 'Admission Number *',
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      errorText: _admWarning,
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
 
-                  // Full Name
                   TextField(
                     controller: _nameCtrl,
                     decoration: InputDecoration(
                       labelText: 'Student Full Name *',
-                      prefixIcon: const Icon(Icons.person),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
 
-                  // Class Selector
                   DropdownButtonFormField<String>(
                     value: _selectedClass,
                     decoration: InputDecoration(
                       labelText: 'Assign Class *',
-                      prefixIcon: const Icon(Icons.class_),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                     items: provider.classes.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                     onChanged: (val) => setState(() => _selectedClass = val),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
 
-                  // Gender
-                  Row(
-                    children: [
-                      const Text('Gender: ', style: TextStyle(fontWeight: FontWeight.bold)),
-                      Radio<String>(value: 'Male', groupValue: _selectedGender, onChanged: (v) => setState(() => _selectedGender = v!)),
-                      const Text('Male'),
-                      Radio<String>(value: 'Female', groupValue: _selectedGender, onChanged: (v) => setState(() => _selectedGender = v!)),
-                      const Text('Female'),
+                  DropdownButtonFormField<String>(
+                    value: _selectedGender,
+                    decoration: InputDecoration(
+                      labelText: 'Gender',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'Male', child: Text('Male')),
+                      DropdownMenuItem(value: 'Female', child: Text('Female')),
                     ],
+                    onChanged: (val) => setState(() => _selectedGender = val ?? 'Male'),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
 
-                  // Guardian & Phone
                   TextField(
                     controller: _fatherCtrl,
                     decoration: InputDecoration(
                       labelText: "Father's / Guardian's Name",
-                      prefixIcon: const Icon(Icons.family_restroom),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
 
                   TextField(
                     controller: _phoneCtrl,
                     keyboardType: TextInputType.phone,
                     decoration: InputDecoration(
-                      labelText: 'Parent Mobile Phone (Login Credential)',
-                      prefixIcon: const Icon(Icons.phone),
+                      labelText: 'Contact Phone Number',
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                   ),
                   const SizedBox(height: 20),
 
-                  ElevatedButton.icon(
+                  ElevatedButton(
                     onPressed: _handleSaveStudent,
-                    icon: const Icon(Icons.save),
-                    label: const Text('Save & Enroll Student'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue.shade600,
                       foregroundColor: Colors.white,
                       minimumSize: const Size.fromHeight(48),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
+                    child: const Text('Save & Enroll Student'),
                   ),
                 ],
               ),
@@ -244,42 +344,38 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> with SingleTick
           ),
 
           // TAB 3: MANAGE STUDENTS
-          SingleChildScrollView(
+          ListView.separated(
             padding: const EdgeInsets.all(16),
-            child: provider.students.isEmpty
-                ? const Center(child: Padding(padding: EdgeInsets.all(40), child: Text('No students registered yet.')))
-                : ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: provider.students.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (ctx, idx) {
-                      final s = provider.students[idx];
-                      return Card(
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          side: BorderSide(color: Colors.grey.shade200),
-                        ),
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: Colors.blue.shade50,
-                            child: Text(s.adm, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                          ),
-                          title: Text(s.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text('Class: ${s.studentClass} • Father: ${s.father.isNotEmpty ? s.father : '-'} • Status: ${s.status}'),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                            onPressed: () => provider.deleteStudent(s.id),
-                          ),
-                        ),
-                      );
-                    },
+            itemCount: provider.students.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            itemBuilder: (ctx, idx) {
+              final s = provider.students[idx];
+              return Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: BorderSide(color: Colors.grey.shade200)),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.blue.shade50,
+                    child: Text('#${s.adm}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                   ),
+                  title: Text(s.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text('${s.studentClass} • ${s.gender} • Father: ${s.father.isNotEmpty ? s.father : '-'} • Status: ${s.status}'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                        onPressed: () => provider.deleteStudent(s.id),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
 
-          // TAB 4: CLASSES
-          Padding(
+          // TAB 4: CLASSES & DIVISIONS
+          SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -290,53 +386,36 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> with SingleTick
                       child: TextField(
                         controller: _newClassCtrl,
                         decoration: InputDecoration(
-                          hintText: 'Enter new class (e.g. Class 1, Grade 5)...',
+                          hintText: 'e.g. Class 11, Class 12, Pre-Primary',
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                       ),
                     ),
                     const SizedBox(width: 12),
-                    ElevatedButton.icon(
+                    ElevatedButton(
                       onPressed: () {
-                        if (_newClassCtrl.text.isNotEmpty) {
-                          provider.addClass(_newClassCtrl.text.trim());
+                        final val = _newClassCtrl.text.trim();
+                        if (val.isNotEmpty) {
+                          provider.addClass(val);
                           _newClassCtrl.clear();
                         }
                       },
-                      icon: const Icon(Icons.add),
-                      label: const Text('Add Class'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue.shade600,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade600, foregroundColor: Colors.white),
+                      child: const Text('Add Class'),
                     ),
                   ],
                 ),
                 const SizedBox(height: 20),
-                Expanded(
-                  child: provider.classes.isEmpty
-                      ? const Center(child: Text('No classes added yet. Add classes above.'))
-                      : ListView.separated(
-                          itemCount: provider.classes.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 8),
-                          itemBuilder: (ctx, idx) {
-                            final c = provider.classes[idx];
-                            return Card(
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: BorderSide(color: Colors.grey.shade200)),
-                              child: ListTile(
-                                leading: const Icon(Icons.meeting_room, color: Colors.blue),
-                                title: Text(c, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                trailing: IconButton(
-                                  icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                                  onPressed: () => provider.removeClass(c),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: provider.classes.map((cls) {
+                    return Chip(
+                      label: Text(cls),
+                      deleteIcon: const Icon(Icons.close, size: 16),
+                      onDeleted: () => provider.removeClass(cls),
+                    );
+                  }).toList(),
                 ),
               ],
             ),
@@ -361,10 +440,10 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> with SingleTick
                     color: Colors.red.shade50.withOpacity(0.3),
                     child: ListTile(
                       title: Text('${st.name} (Adm: #${st.adm})', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Text('Status: DISCONTINUED • Frozen Dues: ${setting.currencySymbol}${st.frozenPendingDue}'),
+                      subtitle: Text('Status: DISCONTINUED • Exit Reason: ${st.exitReason.isNotEmpty ? st.exitReason : "Relocation"} • Dues Preserved: ₹${st.frozenPendingDue}'),
                       trailing: ElevatedButton(
                         onPressed: () {
-                          provider.updateStudent(st.copyWith(status: 'Active'));
+                          provider.readmitStudent(st, st.studentClass, provider.setting.activeAcademicYear, 'Re-admitted after gap');
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${st.name} re-admitted to active roll.')));
                         },
                         style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
@@ -382,7 +461,72 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> with SingleTick
             ),
           ),
 
-          // TAB 6: INSTITUTION SETTINGS (100% White-Label)
+          // TAB 6: STAFF & TEACHERS MANAGEMENT
+          Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('STAFF DIRECTORY (${provider.staffList.length})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    ElevatedButton.icon(
+                      onPressed: () => _showAddStaffDialog(context),
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('Add Staff / Ustad', style: TextStyle(fontSize: 12)),
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: provider.staffList.isEmpty
+                    ? const Center(child: Text('No staff members registered. Click Add Staff above.'))
+                    : ListView.separated(
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        itemCount: provider.staffList.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (ctx, idx) {
+                          final st = provider.staffList[idx];
+                          return Card(
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: BorderSide(color: Colors.grey.shade200)),
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: const Color(0xFFEFF6FF),
+                                child: Text(
+                                  st.name.isNotEmpty ? st.name.substring(0, 1).toUpperCase() : 'U',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2563EB)),
+                                ),
+                              ),
+                              title: Row(
+                                children: [
+                                  Text(st.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFEFF6FF),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(st.designation.toUpperCase(), style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
+                                  ),
+                                ],
+                              ),
+                              subtitle: Text('Role: ${st.role} • Class: ${st.assignedClass.isNotEmpty ? st.assignedClass : "All"} • Ph: ${st.phone}'),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                                onPressed: () => provider.deleteStaff(st.id),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+
+          // TAB 7: INSTITUTION SETTINGS (100% White-Label)
           SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             child: Container(

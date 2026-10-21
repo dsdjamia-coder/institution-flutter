@@ -15,6 +15,12 @@ class Student {
   final double concessionAmount;
   final String academicYear;
   final double frozenPendingDue;
+  final String graduatedYear;
+  final String completedClass;
+  final String exitDate;
+  final String exitReason;
+  final String returnDate;
+  final List<dynamic> continuityLog;
 
   Student({
     required this.id,
@@ -33,6 +39,12 @@ class Student {
     this.concessionAmount = 0.0,
     this.academicYear = '2026-2027',
     this.frozenPendingDue = 0.0,
+    this.graduatedYear = '',
+    this.completedClass = '',
+    this.exitDate = '',
+    this.exitReason = '',
+    this.returnDate = '',
+    this.continuityLog = const [],
   });
 
   /// Compound identity pill string to ensure zero ambiguity for identical names
@@ -50,7 +62,7 @@ class Student {
       roll: int.tryParse(map['roll']?.toString() ?? '') ?? 1,
       gender: (map['gender'] ?? 'Male').toString(),
       mobile: (map['mobile'] ?? map['phone'] ?? '').toString().trim(),
-      father: (map['father'] ?? map['fatherName'] ?? '').toString().trim(),
+      father: (map['father'] ?? map['fatherName'] ?? map['guardianName'] ?? '').toString().trim(),
       mother: (map['mother'] ?? map['motherName'] ?? '').toString().trim(),
       dob: (map['dob'] ?? '').toString(),
       address: (map['address'] ?? '').toString(),
@@ -59,6 +71,12 @@ class Student {
       concessionAmount: double.tryParse(map['concessionAmount']?.toString() ?? '') ?? 0.0,
       academicYear: (map['academicYear'] ?? '2026-2027').toString(),
       frozenPendingDue: double.tryParse(map['frozenPendingDue']?.toString() ?? '') ?? 0.0,
+      graduatedYear: (map['graduatedYear'] ?? '').toString(),
+      completedClass: (map['completedClass'] ?? '').toString(),
+      exitDate: (map['exitDate'] ?? '').toString(),
+      exitReason: (map['exitReason'] ?? '').toString(),
+      returnDate: (map['returnDate'] ?? '').toString(),
+      continuityLog: map['continuityLog'] is List ? (map['continuityLog'] as List) : const [],
     );
   }
 
@@ -74,14 +92,22 @@ class Student {
       'mobile': mobile,
       'phone': mobile,
       'father': father.toUpperCase().trim(),
+      'guardianName': father.toUpperCase().trim(),
       'mother': mother.toUpperCase().trim(),
       'dob': dob,
       'address': address,
       'status': status,
       'photo': photo,
+      'photoUrl': photo,
       'concessionAmount': concessionAmount,
       'academicYear': academicYear,
       'frozenPendingDue': frozenPendingDue,
+      'graduatedYear': graduatedYear,
+      'completedClass': completedClass,
+      'exitDate': exitDate,
+      'exitReason': exitReason,
+      'returnDate': returnDate,
+      'continuityLog': continuityLog,
     };
   }
 
@@ -102,6 +128,12 @@ class Student {
     double? concessionAmount,
     String? academicYear,
     double? frozenPendingDue,
+    String? graduatedYear,
+    String? completedClass,
+    String? exitDate,
+    String? exitReason,
+    String? returnDate,
+    List<dynamic>? continuityLog,
   }) {
     return Student(
       id: id ?? this.id,
@@ -120,6 +152,12 @@ class Student {
       concessionAmount: concessionAmount ?? this.concessionAmount,
       academicYear: academicYear ?? this.academicYear,
       frozenPendingDue: frozenPendingDue ?? this.frozenPendingDue,
+      graduatedYear: graduatedYear ?? this.graduatedYear,
+      completedClass: completedClass ?? this.completedClass,
+      exitDate: exitDate ?? this.exitDate,
+      exitReason: exitReason ?? this.exitReason,
+      returnDate: returnDate ?? this.returnDate,
+      continuityLog: continuityLog ?? this.continuityLog,
     );
   }
 }

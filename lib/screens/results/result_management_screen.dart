@@ -40,11 +40,124 @@ class _ResultManagementScreenState extends State<ResultManagementScreen> {
     super.dispose();
   }
 
+  void _showPromotionDialog(BuildContext context) {
+    final provider = context.read<InstitutionProvider>();
+    String fromCls = _selectedClass ?? (provider.classes.isNotEmpty ? provider.classes.first : 'Class 1');
+    String toCls = 'Class 2';
+    bool isTerminalAlumni = fromCls == 'Class 12' || fromCls == provider.classes.last;
+
+    final targetOptions = [
+      ...provider.classes,
+      'Alumni (Graduated)',
+    ];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.upgrade_rounded, color: Color(0xFF2563EB)),
+              SizedBox(width: 8),
+              Text('Annual Promotion Engine', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Promote passing students to the next class for the upcoming academic year. Final-year terminal students transition directly to Alumni status.',
+                style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: fromCls,
+                decoration: const InputDecoration(labelText: 'From Class', border: OutlineInputBorder()),
+                items: provider.classes.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                onChanged: (val) {
+                  setDialogState(() {
+                    fromCls = val!;
+                    final idx = provider.classes.indexOf(fromCls);
+                    if (idx < provider.classes.length - 1) {
+                      toCls = provider.classes[idx + 1];
+                      isTerminalAlumni = false;
+                    } else {
+                      toCls = 'Alumni (Graduated)';
+                      isTerminalAlumni = true;
+                    }
+                  });
+                },
+              ),
+              const SizedBox(height: 14),
+              DropdownButtonFormField<String>(
+                value: toCls,
+                decoration: const InputDecoration(labelText: 'Promote To Class', border: OutlineInputBorder()),
+                items: targetOptions.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                onChanged: (val) {
+                  setDialogState(() {
+                    toCls = val!;
+                    isTerminalAlumni = toCls.contains('Alumni');
+                  });
+                },
+              ),
+              const SizedBox(height: 12),
+              if (isTerminalAlumni)
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFAF5FF),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFE9D5FF)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.school, color: Color(0xFF9333EA), size: 20),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '🎓 Students will graduate into the Alumni Register with their completion record preserved.',
+                          style: TextStyle(fontSize: 11, color: Color(0xFF7E22CE), fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await provider.promoteClass(fromCls, isTerminalAlumni ? 'Alumni' : toCls, isTerminalAlumni);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Class $fromCls promoted successfully to ${isTerminalAlumni ? 'Alumni' : toCls}!'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
+              child: const Text('Execute Promotion'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<InstitutionProvider>();
-    final classStudents = provider.students
-        .where((s) => s.studentClass == _selectedClass && s.status == 'Active')
+    final classStudents = provider.activeStudents
+        .where((s) => s.studentClass == _selectedClass)
         .toList();
 
     return Scaffold(
@@ -56,6 +169,13 @@ class _ResultManagementScreenState extends State<ResultManagementScreen> {
           'Result Management System',
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0F172A)),
         ),
+        actions: [
+          TextButton.icon(
+            onPressed: () => _showPromotionDialog(context),
+            icon: const Icon(Icons.upgrade, size: 18, color: Color(0xFF2563EB)),
+            label: const Text('Promote / Alumni', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -100,103 +220,148 @@ class _ResultManagementScreenState extends State<ResultManagementScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
 
-            // Publishing Banner
+            // Publishing Status Toggle
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue.shade200),
+                border: Border.all(color: Colors.grey.shade200),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Publish Results to Student Portal', style: TextStyle(fontWeight: FontWeight.bold)),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Publish on Student Portal', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      Text(
+                        _isPublishEnabled ? 'Results are visible to students' : 'Results are hidden (Draft)',
+                        style: TextStyle(fontSize: 11, color: _isPublishEnabled ? Colors.green : Colors.grey),
+                      ),
+                    ],
+                  ),
                   Switch(
                     value: _isPublishEnabled,
+                    onChanged: (val) => setState(() => _isPublishEnabled = val),
                     activeColor: Colors.blue.shade600,
-                    onChanged: (v) => setState(() => _isPublishEnabled = v),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
 
-            // Marks Entry Table
-            classStudents.isEmpty
-                ? const Center(child: Padding(padding: EdgeInsets.all(40), child: Text('No active students found in this class.')))
-                : Container(
+            // Students Mark Input Table
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'CANDIDATES (${classStudents.length})',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5),
+                ),
+                Text(
+                  _selectedClass ?? '',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blue.shade700),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            if (classStudents.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(32),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Center(
+                  child: Column(
+                    children: [
+                      Icon(Icons.person_off, size: 36, color: Colors.grey.shade400),
+                      const SizedBox(height: 8),
+                      Text('No active students registered in ${_selectedClass ?? "this class"}.', style: const TextStyle(color: Colors.grey)),
+                    ],
+                  ),
+                ),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: classStudents.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (ctx, idx) {
+                  final st = classStudents[idx];
+                  final ctrl = _markControllers.putIfAbsent(st.id, () => TextEditingController(text: ''));
+
+                  final currentMark = double.tryParse(ctrl.text) ?? 0.0;
+                  final grade = ExamResult.calculateGrade(currentMark);
+
+                  return Container(
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.grey.shade200),
                     ),
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: classStudents.length,
-                      separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade100),
-                      itemBuilder: (ctx, idx) {
-                        final st = classStudents[idx];
-                        if (!_markControllers.containsKey(st.id)) {
-                          _markControllers[st.id] = TextEditingController(text: '85');
-                        }
-                        final ctrl = _markControllers[st.id]!;
-                        final mark = double.tryParse(ctrl.text) ?? 0.0;
-                        final grade = ExamResult.calculateGrade(mark);
-
-                        return Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Row(
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 18,
+                          backgroundColor: Colors.blue.shade50,
+                          child: Text(
+                            '#${st.adm}',
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blue.shade700),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              CircleAvatar(
-                                backgroundColor: Colors.blue.shade50,
-                                child: Text('#${st.adm}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(st.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                    Text('Roll: ${st.roll} • Class: ${st.studentClass}', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
-                                  ],
-                                ),
-                              ),
-                              SizedBox(
-                                width: 90,
-                                child: TextField(
-                                  controller: ctrl,
-                                  keyboardType: TextInputType.number,
-                                  textAlign: TextAlign.center,
-                                  decoration: InputDecoration(
-                                    labelText: 'Mark (100)',
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-                                  ),
-                                  onChanged: (_) => setState(() {}),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Container(
-                                width: 44,
-                                height: 36,
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                  color: Colors.indigo.shade50,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.indigo.shade200),
-                                ),
-                                child: Text(grade, style: TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo.shade800)),
-                              ),
+                              Text(st.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                              Text('Roll: ${st.roll} • ${st.gender}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
                             ],
                           ),
-                        );
-                      },
+                        ),
+                        Container(
+                          width: 80,
+                          height: 40,
+                          margin: const EdgeInsets.symmetric(horizontal: 8),
+                          child: TextField(
+                            controller: ctrl,
+                            keyboardType: TextInputType.number,
+                            textAlign: TextAlign.center,
+                            decoration: InputDecoration(
+                              hintText: 'Marks',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                              contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                            ),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: Colors.indigo.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.indigo.shade200),
+                          ),
+                          child: Center(
+                            child: Text(grade, style: TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo.shade800)),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
+                  );
+                },
+              ),
+
             const SizedBox(height: 20),
 
             ElevatedButton.icon(
@@ -218,8 +383,8 @@ class _ResultManagementScreenState extends State<ResultManagementScreen> {
 
   void _saveMarks() async {
     final provider = context.read<InstitutionProvider>();
-    final classStudents = provider.students
-        .where((s) => s.studentClass == _selectedClass && s.status == 'Active')
+    final classStudents = provider.activeStudents
+        .where((s) => s.studentClass == _selectedClass)
         .toList();
 
     for (final st in classStudents) {

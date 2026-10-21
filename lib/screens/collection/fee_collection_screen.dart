@@ -186,7 +186,7 @@ class _FeeCollectionScreenState extends State<FeeCollectionScreen> with SingleTi
                           Expanded(
                             flex: 2,
                             child: CompoundStudentSearch(
-                              students: provider.students,
+                              students: provider.activeStudents,
                               selectedClass: _selectedClass,
                               selectedStudent: _selectedStudent,
                               hintText: 'Type Name or Adm No...',

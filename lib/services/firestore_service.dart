@@ -218,6 +218,24 @@ class FirestoreService {
 
   static String paymentModeToString(dynamic mode) => mode.toString();
 
+  Future<bool> updatePayment(Payment payment) async {
+    final idx = _cachedPayments.indexWhere((p) => p.id == payment.id);
+    if (idx != -1) {
+      _cachedPayments[idx] = payment;
+    }
+    try {
+      final url = Uri.parse('$baseUrl/payments/${payment.id}');
+      final body = jsonEncode({
+        'fields': _encodeFirestoreFields(payment.toMap()),
+      });
+      final res = await http.patch(url, body: body, headers: {'Content-Type': 'application/json'});
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('[FirestoreService] updatePayment notice: $e');
+      return true;
+    }
+  }
+
   // ==================== STAFF ====================
   Future<List<Staff>> fetchStaff() async {
     try {
@@ -269,6 +287,38 @@ class FirestoreService {
       debugPrint('[FirestoreService] createStaff notice: $e');
     }
     return newStaff;
+  }
+
+  Future<bool> saveStaff(Staff staff) async {
+    final idx = _cachedStaff.indexWhere((s) => s.id == staff.id);
+    if (idx != -1) {
+      _cachedStaff[idx] = staff;
+    } else {
+      _cachedStaff.add(staff);
+    }
+    try {
+      final url = Uri.parse('$baseUrl/staff/${staff.id}');
+      final body = jsonEncode({
+        'fields': _encodeFirestoreFields(staff.toMap()),
+      });
+      final res = await http.patch(url, body: body, headers: {'Content-Type': 'application/json'});
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('[FirestoreService] saveStaff notice: $e');
+      return true;
+    }
+  }
+
+  Future<bool> deleteStaff(String staffId) async {
+    _cachedStaff.removeWhere((s) => s.id == staffId);
+    try {
+      final url = Uri.parse('$baseUrl/staff/$staffId');
+      final res = await http.delete(url);
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('[FirestoreService] deleteStaff notice: $e');
+      return true;
+    }
   }
 
   // ==================== EXAM RESULTS ====================

@@ -51,6 +51,16 @@ class InstitutionProvider extends ChangeNotifier {
       _students.where((s) => s.status.toLowerCase() == 'active' && s.gender.toLowerCase() == 'female').length;
   int get totalStaff => _staffList.length;
 
+  // Filtered lists for strict portal isolation
+  List<Student> get activeStudents =>
+      _students.where((s) => s.status == 'Active').toList();
+
+  List<Student> get alumniStudents =>
+      _students.where((s) => s.status == 'Alumni' || s.studentClass.toLowerCase() == 'alumni').toList();
+
+  List<Student> get discontinuedStudents =>
+      _students.where((s) => s.status == 'Discontinued').toList();
+
   double get todayCollection {
     final today = DateTime.now().toString().split(' ')[0];
     return _payments
@@ -83,6 +93,23 @@ class InstitutionProvider extends ChangeNotifier {
       _students = await _firestoreService.fetchStudents();
       _payments = await _firestoreService.fetchPayments();
       _staffList = await _firestoreService.fetchStaff();
+
+      if (_classes.isEmpty) {
+        _classes = [
+          'Class 1',
+          'Class 2',
+          'Class 3',
+          'Class 4',
+          'Class 5',
+          'Class 6',
+          'Class 7',
+          'Class 8',
+          'Class 9',
+          'Class 10',
+          'Class 11',
+          'Class 12',
+        ];
+      }
     } catch (e) {
       debugPrint('[InstitutionProvider] init error: $e');
     } finally {
@@ -112,6 +139,28 @@ class InstitutionProvider extends ChangeNotifier {
     await _firestoreService.saveClasses(_classes);
   }
 
+  // ==================== STAFF MANAGEMENT ====================
+  Future<void> addStaff(Staff staff) async {
+    _staffList.add(staff);
+    notifyListeners();
+    await _firestoreService.saveStaff(staff);
+  }
+
+  Future<void> updateStaff(Staff staff) async {
+    final idx = _staffList.indexWhere((s) => s.id == staff.id);
+    if (idx != -1) {
+      _staffList[idx] = staff;
+      notifyListeners();
+      await _firestoreService.saveStaff(staff);
+    }
+  }
+
+  Future<void> deleteStaff(String staffId) async {
+    _staffList.removeWhere((s) => s.id == staffId);
+    notifyListeners();
+    await _firestoreService.deleteStaff(staffId);
+  }
+
   // ==================== STUDENTS ====================
   /// Add student with strict duplicate admission prevention
   Future<String?> addStudent(Student student) async {
@@ -129,18 +178,18 @@ class InstitutionProvider extends ChangeNotifier {
       _students,
     );
     if (candidate != null) {
-      return 'A student named "${student.name}" already exists in ${student.studentClass} (Adm: ${candidate.adm}).';
+      return 'Potential duplicate student: ${candidate.compoundIdentity} already exists!';
     }
 
     _isLoading = true;
     notifyListeners();
 
     try {
-      final created = await _firestoreService.createStudent(student);
-      _students.add(created);
-      return null; // Success
+      final saved = await _firestoreService.saveStudent(student);
+      _students.add(saved);
+      return null;
     } catch (e) {
-      return 'Failed to add student: $e';
+      return 'Failed to save student: $e';
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -160,6 +209,72 @@ class InstitutionProvider extends ChangeNotifier {
     _students.removeWhere((s) => s.id == studentId);
     notifyListeners();
     await _firestoreService.deleteStudent(studentId);
+  }
+
+  // ==================== CONTINUITY & ALUMNI ====================
+  /// Discontinue student
+  Future<void> discontinueStudent(Student student, String reason, String exitDate) async {
+    final updated = student.copyWith(
+      status: 'Discontinued',
+      exitReason: reason,
+      exitDate: exitDate,
+      continuityLog: [
+        ...student.continuityLog,
+        {
+          'action': 'DISCONTINUED',
+          'date': exitDate,
+          'reason': reason,
+          'class': student.studentClass,
+          'academicYear': student.academicYear,
+        }
+      ],
+    );
+    await updateStudent(updated);
+  }
+
+  /// Re-admit student after gap years
+  Future<void> readmitStudent(Student student, String targetClass, String targetYear, String reason) async {
+    final returnDate = DateTime.now().toString().split(' ')[0];
+    final updated = student.copyWith(
+      status: 'Active',
+      studentClass: targetClass,
+      academicYear: targetYear,
+      returnDate: returnDate,
+      continuityLog: [
+        ...student.continuityLog,
+        {
+          'action': 'READMITTED',
+          'date': returnDate,
+          'targetClass': targetClass,
+          'targetYear': targetYear,
+          'notes': reason,
+        }
+      ],
+    );
+    await updateStudent(updated);
+  }
+
+  /// Promote class students to next class or Alumni
+  Future<void> promoteClass(String fromClass, String toClass, bool isFinalYear) async {
+    final cohort = _students.where((s) => s.studentClass == fromClass && s.status == 'Active').toList();
+    final currentYear = _setting.activeAcademicYear;
+
+    for (final s in cohort) {
+      if (isFinalYear || toClass == 'Alumni') {
+        final alumni = s.copyWith(
+          status: 'Alumni',
+          studentClass: 'Alumni',
+          graduatedYear: currentYear,
+          completedClass: fromClass,
+        );
+        await updateStudent(alumni);
+      } else {
+        final promoted = s.copyWith(
+          studentClass: toClass,
+        );
+        await updateStudent(promoted);
+      }
+    }
   }
 
   // ==================== PAYMENTS ====================
@@ -193,11 +308,11 @@ class InstitutionProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> voidPayment(String paymentId) async {
+  Future<void> voidPayment(String paymentId, {String reason = 'Cancelled by Administrator'}) async {
     final idx = _payments.indexWhere((p) => p.id == paymentId);
     if (idx != -1) {
       final p = _payments[idx];
-      _payments[idx] = Payment(
+      final voided = Payment(
         id: p.id,
         paymentId: p.paymentId,
         receiptNo: p.receiptNo,
@@ -213,7 +328,9 @@ class InstitutionProvider extends ChangeNotifier {
         collectedByName: p.collectedByName,
         status: 'VOIDED',
       );
+      _payments[idx] = voided;
       notifyListeners();
+      await _firestoreService.updatePayment(voided);
     }
   }
 
@@ -273,6 +390,7 @@ class InstitutionProvider extends ChangeNotifier {
         id: 'ADMIN_01',
         name: 'Super Administrator',
         role: 'ADMIN',
+        designation: 'HEADMASTER',
         email: 'admin@institution.edu',
         hasAdminAccess: true,
         hasCollectionAccess: true,

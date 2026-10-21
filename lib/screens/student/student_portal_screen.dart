@@ -129,7 +129,10 @@ class _StudentPortalScreenState extends State<StudentPortalScreen> with SingleTi
                             ),
                             const SizedBox(height: 4),
                             Text('Adm #: ${student.adm}', style: const TextStyle(color: Colors.white70, fontSize: 12, fontFamily: 'monospace')),
-                            Text('Class: ${student.studentClass} • Roll: ${student.roll}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                            if (student.status == 'Alumni')
+                              Text('Graduated Batch: ${student.graduatedYear.isNotEmpty ? student.graduatedYear : student.academicYear}', style: const TextStyle(color: Colors.amberAccent, fontSize: 12, fontWeight: FontWeight.bold))
+                            else
+                              Text('Class: ${student.studentClass} • Roll: ${student.roll}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
                             if (student.father.isNotEmpty)
                               Text('Guardian: ${student.father}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
                             if (student.mobile.isNotEmpty)
