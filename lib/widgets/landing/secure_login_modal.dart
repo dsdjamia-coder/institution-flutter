@@ -72,8 +72,8 @@ class _SecureLoginModalState extends State<SecureLoginModal> {
         Student? student = _selectedStudent;
         if (student == null) {
           final matched = provider.students.where((s) {
-            final matchesClass = _selectedClass == null || _selectedClass!.isEmpty || s.className == _selectedClass;
-            final matchesQuery = s.admissionNo.toLowerCase() == query.toLowerCase() ||
+            final matchesClass = _selectedClass == null || _selectedClass!.isEmpty || s.studentClass == _selectedClass;
+            final matchesQuery = s.adm.toLowerCase() == query.toLowerCase() ||
                 s.name.toLowerCase().contains(query.toLowerCase());
             return matchesClass && matchesQuery;
           }).toList();
@@ -88,12 +88,12 @@ class _SecureLoginModalState extends State<SecureLoginModal> {
           if (provider.students.isEmpty) {
             student = Student(
               id: 'demo-student-1',
-              admissionNo: query.isNotEmpty ? query : '4883',
+              adm: query.isNotEmpty ? query : '4883',
               name: query.isNotEmpty ? query : 'Student Preview',
-              className: _selectedClass ?? 'Class 10',
-              phone: password.isNotEmpty ? password : '9946806268',
+              studentClass: _selectedClass ?? 'Class 10',
+              mobile: password.isNotEmpty ? password : '9946806268',
               gender: 'Male',
-              fatherName: 'Father Name',
+              father: 'Father Name',
             );
           } else {
             setState(() {

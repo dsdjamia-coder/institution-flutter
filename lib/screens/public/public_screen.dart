@@ -441,7 +441,7 @@ class _PublicScreenState extends State<PublicScreen> {
                         child: LandingStatCard(
                           title: 'FEMALE',
                           count: femaleCount,
-                          icon: Icons.person_dress_rounded,
+                          icon: Icons.woman_rounded,
                           accentColor: const Color(0xFF06B6D4), // Cyan/Teal
                         ),
                       ),

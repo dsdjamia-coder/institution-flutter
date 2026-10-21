@@ -42,6 +42,7 @@ class InstitutionProvider extends ChangeNotifier {
   Staff? get currentStaff => _currentStaff;
 
   // Calculated Metrics
+  int get totalStudents => _students.length;
   int get totalActiveStudents =>
       _students.where((s) => s.status.toLowerCase() == 'active').length;
   int get totalBoys =>
@@ -295,6 +296,16 @@ class InstitutionProvider extends ChangeNotifier {
       }
     }
     return null;
+  }
+
+  void loginStudent(Student student) {
+    _currentStudent = student;
+    _currentRole = 'student';
+    notifyListeners();
+  }
+
+  Future<bool> loginStaff(String emailOrId, String password) async {
+    return authenticateStaff(emailOrId, password) != null;
   }
 
   void logout() {
