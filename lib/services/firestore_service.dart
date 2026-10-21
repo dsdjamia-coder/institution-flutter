@@ -128,6 +128,8 @@ class FirestoreService {
     return newStudent;
   }
 
+  Future<Student> saveStudent(Student student) => createStudent(student);
+
   Future<bool> updateStudent(Student student) async {
     final idx = _cachedStudents.indexWhere((s) => s.id == student.id);
     if (idx != -1) {
