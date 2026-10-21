@@ -255,7 +255,7 @@ class _PublicScreenState extends State<PublicScreen> {
               title: 'Student & Parent Portal',
               subtitle: 'Access digital ID cards, fee transaction receipts, and report cards.',
               icon: Icons.school,
-              color: Colors.emerald.shade700,
+              color: Colors.teal.shade700,
               onTap: () => _openLoginModal(context),
             ),
           ],

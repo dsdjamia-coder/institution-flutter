@@ -119,7 +119,7 @@ class OfficialHubScreen extends StatelessWidget {
                       title: 'Fee Collection & Accounting',
                       description: 'Fee entry, instant thermal & PDF receipts, master ledger, and transaction history.',
                       icon: Icons.receipt_long,
-                      color: Colors.emerald,
+                      color: Colors.teal,
                       hasAccess: staff?.hasCollectionAccess ?? true,
                       onTap: () {
                         Navigator.push(
@@ -161,7 +161,7 @@ class OfficialHubScreen extends StatelessWidget {
                       title: 'Admin Command Center',
                       description: 'Institution settings, classes, zero-gap continuity, fee rules, and staff permissions.',
                       icon: Icons.admin_panel_settings,
-                      color: Colors.rose,
+                      color: Colors.red,
                       hasAccess: staff?.hasAdminAccess ?? true,
                       onTap: () {
                         Navigator.push(

@@ -123,7 +123,7 @@ class _FeeCollectionScreenState extends State<FeeCollectionScreen> with SingleTi
                       child: Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(colors: [Colors.emerald.shade700, Colors.emerald.shade600]),
+                          gradient: LinearGradient(colors: [Colors.teal.shade700, Colors.teal.shade600]),
                           borderRadius: BorderRadius.circular(14),
                         ),
                         child: Column(
@@ -256,11 +256,11 @@ class _FeeCollectionScreenState extends State<FeeCollectionScreen> with SingleTi
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: Colors.emerald.shade50,
+                                    color: Colors.teal.shade50,
                                     borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: Colors.emerald.shade200),
+                                    border: Border.all(color: Colors.teal.shade200),
                                   ),
-                                  child: const Text('ALREADY PAID', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.emerald)),
+                                  child: const Text('ALREADY PAID', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.teal)),
                                 )
                               else
                                 Text(
@@ -406,7 +406,7 @@ class _FeeCollectionScreenState extends State<FeeCollectionScreen> with SingleTi
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: isVoided ? Colors.grey : Colors.emerald.shade800,
+                                color: isVoided ? Colors.grey : Colors.teal.shade800,
                               ),
                             ),
                             const SizedBox(width: 6),

@@ -133,7 +133,7 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> with SingleTick
                   children: [
                     StatCard(title: 'Active Students', value: provider.totalActiveStudents.toString(), icon: Icons.school, color: Colors.blue),
                     StatCard(title: 'Total Classes', value: provider.classes.length.toString(), icon: Icons.meeting_room, color: Colors.teal),
-                    StatCard(title: "Today's Collection", value: '${setting.currencySymbol}${provider.todayCollection.toStringAsFixed(0)}', icon: Icons.payments, color: Colors.emerald),
+                    StatCard(title: "Today's Collection", value: '${setting.currencySymbol}${provider.todayCollection.toStringAsFixed(0)}', icon: Icons.payments, color: Colors.teal),
                     StatCard(title: 'Staff Members', value: provider.totalStaff.toString(), icon: Icons.badge, color: Colors.indigo),
                   ],
                 ),
@@ -357,8 +357,8 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> with SingleTick
                 const SizedBox(height: 16),
                 ...provider.students.where((s) => s.status == 'Discontinued').map((st) {
                   return Card(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: BorderSide(color: Colors.rose.shade200)),
-                    color: Colors.rose.shade50.withOpacity(0.3),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: BorderSide(color: Colors.red.shade200)),
+                    color: Colors.red.shade50.withOpacity(0.3),
                     child: ListTile(
                       title: Text('${st.name} (Adm: #${st.adm})', style: const TextStyle(fontWeight: FontWeight.bold)),
                       subtitle: Text('Status: DISCONTINUED • Frozen Dues: ${setting.currencySymbol}${st.frozenPendingDue}'),

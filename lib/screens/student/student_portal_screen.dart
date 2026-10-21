@@ -188,10 +188,10 @@ class _StudentPortalScreenState extends State<StudentPortalScreen> with SingleTi
                                 leading: Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: Colors.emerald.shade50,
+                                    color: Colors.teal.shade50,
                                     borderRadius: BorderRadius.circular(8),
                                   ),
-                                  child: Icon(Icons.receipt, color: Colors.emerald.shade700),
+                                  child: Icon(Icons.receipt, color: Colors.teal.shade700),
                                 ),
                                 title: Text('Receipt #${p.receiptNo} • ${p.paymentMode}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                                 subtitle: Text('${p.paymentDate} • ${p.feeItems.map((e) => e.itemLabel).join(', ')}', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
@@ -200,7 +200,7 @@ class _StudentPortalScreenState extends State<StudentPortalScreen> with SingleTi
                                   children: [
                                     Text(
                                       '${setting.currencySymbol}${p.amount.toStringAsFixed(0)}',
-                                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.emerald.shade800),
+                                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.teal.shade800),
                                     ),
                                     const SizedBox(width: 8),
                                     IconButton(
