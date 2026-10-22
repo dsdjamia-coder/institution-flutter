@@ -40,15 +40,7 @@ class AppCard extends StatelessWidget {
         gradient: gradient,
         borderRadius: r,
         border: Border.all(color: border),
-        boxShadow: isElevated
-            ? const [
-                BoxShadow(
-                  color: AppColors.cardShadow,
-                  blurRadius: 16,
-                  offset: Offset(0, 4),
-                ),
-              ]
-            : null,
+        boxShadow: isElevated ? AppColors.cardShadow : null,
       ),
       child: child,
     );

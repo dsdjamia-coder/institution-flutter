@@ -213,9 +213,7 @@ class _PublicScreenState extends State<PublicScreen> {
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(18),
                             border: Border.all(color: AppColors.slate200),
-                            boxShadow: const [
-                              BoxShadow(color: AppColors.cardShadow, blurRadius: 16, offset: Offset(0, 4)),
-                            ],
+                            boxShadow: AppColors.cardShadow,
                           ),
                           child: Text(
                             setting.aboutText.isNotEmpty
@@ -299,7 +297,7 @@ class _PublicScreenState extends State<PublicScreen> {
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(color: AppColors.slate200),
-                      boxShadow: const [BoxShadow(color: AppColors.cardShadow, blurRadius: 10, offset: Offset(0, 2))],
+                      boxShadow: AppColors.cardShadow,
                     ),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
@@ -346,7 +344,7 @@ class _PublicScreenState extends State<PublicScreen> {
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(14),
                                   border: Border.all(color: AppColors.slate200),
-                                  boxShadow: const [BoxShadow(color: AppColors.cardShadow, blurRadius: 8, offset: Offset(0, 2))],
+                                  boxShadow: AppColors.cardShadow,
                                 ),
                                 clipBehavior: Clip.antiAlias,
                                 child: Stack(
@@ -403,7 +401,7 @@ class _PublicScreenState extends State<PublicScreen> {
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: AppColors.slate200)),
-        boxShadow: [BoxShadow(color: AppColors.cardShadow, blurRadius: 10, offset: Offset(0, 2))],
+        boxShadow: AppColors.cardShadow,
       ),
       child: Center(
         child: Container(
@@ -733,9 +731,7 @@ class _PublicScreenState extends State<PublicScreen> {
               color: Colors.white,
               borderRadius: BorderRadius.circular(24),
               border: Border.all(color: AppColors.slate200),
-              boxShadow: const [
-                BoxShadow(color: AppColors.cardShadow, blurRadius: 24, offset: Offset(0, 8)),
-              ],
+              boxShadow: AppColors.cardHoverShadow,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -836,7 +832,7 @@ class _PublicScreenState extends State<PublicScreen> {
             color: Colors.white,
             shape: BoxShape.circle,
             border: Border.all(color: AppColors.slate200),
-            boxShadow: const [BoxShadow(color: AppColors.cardShadow, blurRadius: 16, offset: Offset(0, 4))],
+            boxShadow: AppColors.cardShadow,
           ),
           clipBehavior: Clip.antiAlias,
           child: Image.asset(
@@ -1081,9 +1077,7 @@ class _PublicScreenState extends State<PublicScreen> {
         color: Colors.white,
         shape: BoxShape.circle,
         border: Border.all(color: AppColors.slate200),
-        boxShadow: const [
-          BoxShadow(color: AppColors.cardShadow, blurRadius: 4, offset: Offset(0, 1)),
-        ],
+        boxShadow: AppColors.cardShadow,
       ),
       child: Center(
         child: Icon(icon, color: color, size: 18),
