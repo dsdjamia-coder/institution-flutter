@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'app_colors.dart';
 import 'app_typography.dart';
 import 'app_radius.dart';
-import 'app_spacing.dart';
 
 /// Material 3 Light & Dark Theme Definitions
 class AppTheme {
   // ==================== LIGHT THEME ====================
   static ThemeData get light {
-    final colorScheme = ColorScheme.light(
+    final colorScheme = ColorScheme.fromSeed(
+      seedColor: AppColors.primary,
       primary: AppColors.primary,
       onPrimary: Colors.white,
       primaryContainer: AppColors.primary50,
@@ -17,11 +17,11 @@ class AppTheme {
       onSecondary: Colors.white,
       surface: AppColors.lightSurface,
       onSurface: AppColors.lightTextPrimary,
-      surfaceContainerHighest: AppColors.slate100,
       outline: AppColors.lightBorder,
       outlineVariant: AppColors.slate200,
       error: AppColors.error,
       onError: Colors.white,
+      brightness: Brightness.light,
     );
 
     return ThemeData(
@@ -117,7 +117,8 @@ class AppTheme {
 
   // ==================== DARK THEME ====================
   static ThemeData get dark {
-    final colorScheme = ColorScheme.dark(
+    final colorScheme = ColorScheme.fromSeed(
+      seedColor: AppColors.primary,
       primary: AppColors.primary400,
       onPrimary: Colors.black,
       primaryContainer: AppColors.primary900,
@@ -126,11 +127,11 @@ class AppTheme {
       onSecondary: Colors.white,
       surface: AppColors.darkSurface,
       onSurface: AppColors.darkTextPrimary,
-      surfaceContainerHighest: AppColors.darkSurfaceElevated,
       outline: AppColors.darkBorder,
       outlineVariant: AppColors.slate700,
       error: AppColors.error,
       onError: Colors.white,
+      brightness: Brightness.dark,
     );
 
     return ThemeData(
