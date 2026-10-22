@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../../core/theme/app_colors.dart';
 import '../../providers/institution_provider.dart';
 import '../../models/student.dart';
 import '../../models/staff.dart';
@@ -28,6 +30,32 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
   int _currentSubIndex = 0;
 
   // ==================== CONTROLLERS & FORM STATES ====================
+  // Academic Year Form State
+  final _yearLabelCtrl = TextEditingController(text: '2026-2027');
+  String _yearStartMonth = 'June';
+  String _yearEndMonth = 'March';
+  String _yearStatus = 'active';
+
+  // Staff Directory Filter & State
+  final _staffSearchCtrl = TextEditingController();
+  String _staffRoleFilter = 'ALL';
+
+  // Add Staff Form State
+  final _addStaffNameCtrl = TextEditingController();
+  final _addStaffDesigCtrl = TextEditingController(text: 'TEACHER');
+  final _addStaffSamasthaCtrl = TextEditingController();
+  final _addStaffPhoneCtrl = TextEditingController();
+  final _addStaffEmailCtrl = TextEditingController();
+  final _addStaffUpiAccCtrl = TextEditingController();
+  final _addStaffUpiIdCtrl = TextEditingController();
+  String _addStaffRole = 'TEACHER';
+  bool _addStaffCanCollect = true;
+  bool _addStaffCanWorksheet = true;
+  bool _addStaffCanResults = true;
+  bool _addStaffCanAdmin = false;
+  bool _addStaffActAsSuperAdmin = false;
+  final Set<String> _addStaffAssignedClasses = {};
+
   // Manual Student Form
   final _stuAdmCtrl = TextEditingController();
   final _stuNameCtrl = TextEditingController();
@@ -40,10 +68,20 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
   final _stuAdmDateCtrl = TextEditingController(text: '2026-06-01');
   final _stuAadhaarCtrl = TextEditingController();
   final _stuAddressCtrl = TextEditingController();
+  final _stuRollCtrl = TextEditingController(text: '1');
+  final _stuBloodGroupCtrl = TextEditingController(text: 'O+');
   String _stuGender = 'Male';
   String? _stuClass;
   String _stuStatus = 'Active';
   String? _admDuplicateWarning;
+
+  // Bulk Excel/CSV Import Workstation
+  final _bulkCsvTextCtrl = TextEditingController();
+  String? _bulkTargetClass;
+  List<Map<String, dynamic>> _parsedBulkStudents = [];
+  bool _isParsingBulk = false;
+  bool _isUploadingBulk = false;
+  double _bulkUploadProgress = 0.0;
 
   // Classes & Divisions
   final _newClassCtrl = TextEditingController();
@@ -121,6 +159,7 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
   String _filterClass = 'ALL';
   String _filterGender = 'ALL';
   String _filterStatus = 'ALL';
+  String _sortMode = 'adm';
   final _studentSearchCtrl = TextEditingController();
 
   @override
@@ -196,6 +235,18 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
     _stuAdmDateCtrl.dispose();
     _stuAadhaarCtrl.dispose();
     _stuAddressCtrl.dispose();
+    _stuRollCtrl.dispose();
+    _stuBloodGroupCtrl.dispose();
+    _yearLabelCtrl.dispose();
+    _staffSearchCtrl.dispose();
+    _addStaffNameCtrl.dispose();
+    _addStaffDesigCtrl.dispose();
+    _addStaffSamasthaCtrl.dispose();
+    _addStaffPhoneCtrl.dispose();
+    _addStaffEmailCtrl.dispose();
+    _addStaffUpiAccCtrl.dispose();
+    _addStaffUpiIdCtrl.dispose();
+    _bulkCsvTextCtrl.dispose();
     _newClassCtrl.dispose();
     _divisionBaseCtrl.dispose();
     _divisionCountCtrl.dispose();
@@ -503,8 +554,18 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
     return result ?? false;
   }
 
-  // 1A. OVERVIEW
+  // ========================================================================
+  // MODULE 1: INSTITUTION & ACADEMIC CONTROL
+  // ========================================================================
+
+  // 1A. OVERVIEW & PROFILE
   Widget _buildOverviewTab(InstitutionProvider provider, dynamic setting) {
+    final hasActiveYear = setting.activeAcademicYear.isNotEmpty;
+    final hasClasses = provider.classes.isNotEmpty;
+    final hasStaff = provider.staffList.isNotEmpty;
+    final hasFeeConfig = setting.defaultMonthlyFee > 0;
+    final isConfigured = hasActiveYear && hasClasses && hasStaff && hasFeeConfig;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -512,33 +573,87 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
         children: [
           // Command Center Banner
           Container(
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              gradient: LinearGradient(colors: [Colors.blue.shade900, Colors.indigo.shade800]),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
               borderRadius: BorderRadius.circular(16),
-              boxShadow: [BoxShadow(color: Colors.blue.shade900.withOpacity(0.2), blurRadius: 12, offset: const Offset(0, 4))],
+              boxShadow: AppColors.cardShadow,
+              border: Border.all(color: Colors.white10),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('INSTITUTION COMMAND CENTER', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
-                    const SizedBox(height: 4),
-                    Text(setting.institutionName, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 2),
-                    Text('${setting.place} • Reg #${setting.regNo}', style: const TextStyle(color: Colors.white60, fontSize: 12)),
-                  ],
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white24)),
+                Expanded(
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('ACTIVE YEAR', style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold)),
-                      Text(setting.activeAcademicYear, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2563EB).withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFF2563EB).withOpacity(0.4)),
+                            ),
+                            child: const Text(
+                              'INSTITUTION COMMAND CENTER',
+                              style: TextStyle(color: Color(0xFF93C5FD), fontSize: 10.5, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle),
+                          ),
+                          const SizedBox(width: 4),
+                          const Text('LIVE CLOUD CONNECTED', style: TextStyle(color: Color(0xFF6EE7B7), fontSize: 10, fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        setting.institutionName,
+                        style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.bold, letterSpacing: -0.3),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${setting.place} • Reg #${setting.regNo} • ${setting.managementName}',
+                        style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                      ),
                     ],
+                  ),
+                ),
+                InkWell(
+                  onTap: () => setState(() {
+                    _currentModuleIndex = 0;
+                    _currentSubIndex = 1;
+                  }),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white12),
+                    ),
+                    child: Column(
+                      children: [
+                        const Text('ACTIVE ACADEMIC YEAR', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            Text(setting.activeAcademicYear, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                            const SizedBox(width: 6),
+                            const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Colors.white60),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -546,52 +661,182 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
           ),
           const SizedBox(height: 20),
 
-          // Metrics Grid
+          // Institutional Readiness Status Card
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: AppColors.cardShadow,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          isConfigured ? Icons.verified_rounded : Icons.pending_actions_rounded,
+                          color: isConfigured ? const Color(0xFF059669) : const Color(0xFFD97706),
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        const Text('Institutional Setup & Health Checklist', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isConfigured ? const Color(0xFFECFDF5) : const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: isConfigured ? const Color(0xFFA7F3D0) : const Color(0xFFFDE68A)),
+                      ),
+                      child: Text(
+                        isConfigured ? 'System Fully Configured' : 'Setup Incomplete',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          color: isConfigured ? const Color(0xFF065F46) : const Color(0xFF92400E),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    _buildSetupPill('Active Session', hasActiveYear, setting.activeAcademicYear),
+                    _buildSetupPill('Classes & Cohorts', hasClasses, '${provider.classes.length} Classes'),
+                    _buildSetupPill('Faculty & Accounts', hasStaff, '${provider.staffList.length} Accounts'),
+                    _buildSetupPill('Standard Fee Plan', hasFeeConfig, '₹${setting.defaultMonthlyFee.toStringAsFixed(0)} / mo'),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Live Metrics Grid (6 KPI cards)
           LayoutBuilder(
             builder: (ctx, constraints) {
-              final isWide = constraints.maxWidth >= 700;
+              final isWide = constraints.maxWidth >= 720;
               return GridView.count(
-                crossAxisCount: isWide ? 4 : 2,
+                crossAxisCount: isWide ? 3 : 2,
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
-                childAspectRatio: isWide ? 1.4 : 1.25,
+                childAspectRatio: isWide ? 1.5 : 1.25,
                 children: [
-                  StatCard(title: 'Active Students', value: '${provider.totalActiveStudents}', subtitle: '${provider.totalBoys} Boys • ${provider.totalGirls} Girls', icon: Icons.school_rounded, color: const Color(0xFF2563EB)),
-                  StatCard(title: 'Classes & Divisions', value: '${provider.classes.length}', subtitle: 'Active standards', icon: Icons.class_rounded, color: const Color(0xFF7C3AED)),
-                  StatCard(title: 'Faculty & Staff', value: '${provider.totalStaff}', subtitle: 'Active accounts', icon: Icons.badge_rounded, color: const Color(0xFF059669)),
-                  StatCard(title: 'Custom Fee Items', value: '${provider.customFeeItems.length}', subtitle: 'Catalog items', icon: Icons.receipt_long_rounded, color: const Color(0xFFD97706)),
+                  StatCard(
+                    title: 'Active Students',
+                    value: '${provider.totalActiveStudents}',
+                    subtitle: '${provider.totalBoys} Boys • ${provider.totalGirls} Girls',
+                    icon: Icons.school_rounded,
+                    color: const Color(0xFF2563EB),
+                  ),
+                  StatCard(
+                    title: 'Classes & Divisions',
+                    value: '${provider.classes.length}',
+                    subtitle: 'Active standard cohorts',
+                    icon: Icons.class_rounded,
+                    color: const Color(0xFF7C3AED),
+                  ),
+                  StatCard(
+                    title: 'Faculty & Staff',
+                    value: '${provider.totalStaff}',
+                    subtitle: 'Authenticated roles',
+                    icon: Icons.badge_rounded,
+                    color: const Color(0xFF059669),
+                  ),
+                  StatCard(
+                    title: 'Sibling Groups',
+                    value: '${provider.studentGroups.length}',
+                    subtitle: 'Family fee discount bundles',
+                    icon: Icons.diversity_3_rounded,
+                    color: const Color(0xFF0284C7),
+                  ),
+                  StatCard(
+                    title: 'Custom Fee Heads',
+                    value: '${provider.customFeeItems.length}',
+                    subtitle: 'Catalog items configured',
+                    icon: Icons.receipt_long_rounded,
+                    color: const Color(0xFFD97706),
+                  ),
+                  StatCard(
+                    title: 'Departed Archives',
+                    value: '${provider.discontinuedStudents.length}',
+                    subtitle: 'Preserved dues & records',
+                    icon: Icons.transfer_within_a_station_rounded,
+                    color: const Color(0xFFE11D48),
+                  ),
                 ],
               );
             },
           ),
           const SizedBox(height: 20),
 
-          // Quick Action Launchers
+          // Quick Administrative Launchers
           Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: AppColors.cardShadow,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Quick Administrative Launchers', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                const SizedBox(height: 12),
+                const Text('Administrative Action Launchers', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                const SizedBox(height: 4),
+                const Text('Direct shortcuts to administrative workflows across modules', style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
+                const SizedBox(height: 14),
                 Wrap(
                   spacing: 10,
                   runSpacing: 10,
                   children: [
-                    _buildQuickActionBtn('Add Student', Icons.person_add_rounded, const Color(0xFF2563EB), () => setState(() { _currentModuleIndex = 1; _currentSubIndex = 1; })),
-                    _buildQuickActionBtn('Manage Students', Icons.groups_rounded, const Color(0xFF7C3AED), () => setState(() { _currentModuleIndex = 1; _currentSubIndex = 0; })),
-                    _buildQuickActionBtn('Discontinue / Re-admit', Icons.transfer_within_a_station_rounded, const Color(0xFFE11D48), () => setState(() { _currentModuleIndex = 2; _currentSubIndex = 0; })),
-                    _buildQuickActionBtn('Fee Windows & Alerts', Icons.receipt_rounded, const Color(0xFFD97706), () => setState(() { _currentModuleIndex = 3; _currentSubIndex = 0; })),
-                    _buildQuickActionBtn('Post Notice', Icons.campaign_rounded, const Color(0xFF059669), () => setState(() { _currentModuleIndex = 4; _currentSubIndex = 1; })),
-                    _buildQuickActionBtn('Export Backup', Icons.download_rounded, const Color(0xFF475569), () => setState(() { _currentModuleIndex = 5; _currentSubIndex = 2; })),
+                    _buildQuickActionBtn('Academic Years', Icons.calendar_month_rounded, const Color(0xFF2563EB), () => setState(() { _currentModuleIndex = 0; _currentSubIndex = 1; })),
+                    _buildQuickActionBtn('Staff Directory', Icons.badge_rounded, const Color(0xFF059669), () => setState(() { _currentModuleIndex = 0; _currentSubIndex = 2; })),
+                    _buildQuickActionBtn('Add Staff Member', Icons.person_add_alt_1_rounded, const Color(0xFF0D9488), () => setState(() { _currentModuleIndex = 0; _currentSubIndex = 3; })),
+                    _buildQuickActionBtn('Manage Students', Icons.people_outline_rounded, const Color(0xFF7C3AED), () => setState(() { _currentModuleIndex = 1; _currentSubIndex = 0; })),
+                    _buildQuickActionBtn('Add Student (Manual)', Icons.person_add_rounded, const Color(0xFF2563EB), () => setState(() { _currentModuleIndex = 1; _currentSubIndex = 1; })),
+                    _buildQuickActionBtn('Bulk Excel Upload', Icons.file_upload_rounded, const Color(0xFFD97706), () => setState(() { _currentModuleIndex = 1; _currentSubIndex = 2; })),
+                    _buildQuickActionBtn('Classes & Divisions', Icons.alt_route_rounded, const Color(0xFF4F46E5), () => setState(() { _currentModuleIndex = 1; _currentSubIndex = 3; })),
+                    _buildQuickActionBtn('Discontinue / Exit', Icons.transfer_within_a_station_rounded, const Color(0xFFE11D48), () => setState(() { _currentModuleIndex = 2; _currentSubIndex = 0; })),
+                    _buildQuickActionBtn('Fee Windows & Rules', Icons.receipt_rounded, const Color(0xFFD97706), () => setState(() { _currentModuleIndex = 3; _currentSubIndex = 0; })),
+                    _buildQuickActionBtn('Publish Notice', Icons.campaign_rounded, const Color(0xFF059669), () => setState(() { _currentModuleIndex = 4; _currentSubIndex = 1; })),
+                    _buildQuickActionBtn('Export Backup JSON', Icons.download_rounded, const Color(0xFF475569), () => setState(() { _currentModuleIndex = 5; _currentSubIndex = 2; })),
                   ],
                 ),
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSetupPill(String title, bool isDone, String detail) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDone ? const Color(0xFFF0FDF4) : const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: isDone ? const Color(0xFFBBF7D0) : const Color(0xFFFDE68A)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(isDone ? Icons.check_circle_rounded : Icons.info_outline_rounded, size: 14, color: isDone ? const Color(0xFF059669) : const Color(0xFFD97706)),
+          const SizedBox(width: 6),
+          Text('$title: ', style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+          Text(detail, style: TextStyle(fontSize: 11.5, color: isDone ? const Color(0xFF065F46) : const Color(0xFF92400E), fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -603,11 +848,15 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
       borderRadius: BorderRadius.circular(10),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(color: color.withOpacity(0.08), borderRadius: BorderRadius.circular(10), border: Border.all(color: color.withOpacity(0.2))),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withOpacity(0.2)),
+        ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 16, color: color),
+            Icon(icon, size: 15, color: color),
             const SizedBox(width: 8),
             Text(label, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: color)),
           ],
@@ -618,57 +867,151 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
 
   // 1B. ACADEMIC YEARS
   Widget _buildAcademicYearsTab(InstitutionProvider provider, dynamic setting) {
-    final yearCtrl = TextEditingController(text: '2026-2027');
-    String startMonth = 'June';
-    String endMonth = 'March';
-    String status = 'active';
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Current Working Session Banner
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
+            decoration: BoxDecoration(
+              color: const Color(0xFFECFDF5),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFA7F3D0)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(color: const Color(0xFF059669).withOpacity(0.15), shape: BoxShape.circle),
+                  child: const Icon(Icons.verified_rounded, color: Color(0xFF059669), size: 24),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('ACTIVE WORKING ACADEMIC SESSION', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF065F46), letterSpacing: 0.8)),
+                      const SizedBox(height: 2),
+                      Text(setting.activeAcademicYear, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF064E3B))),
+                      const SizedBox(height: 2),
+                      const Text('All student enrollments, fee structures, mark sheets, and daily attendance default to this session.', style: TextStyle(fontSize: 11.5, color: Color(0xFF047857))),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Configure Academic Year Form
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: AppColors.cardShadow,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                const Text('Configure Academic Year (YYYY-YYYY)', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                const SizedBox(height: 6),
+                const Text('Specify calendar bounds and working status. Switch working sessions with automatic continuity checks.', style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
+                const SizedBox(height: 14),
+
+                // Quick suggestions
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
                   children: [
-                    const Text('Configure Academic Years (YYYY-YYYY)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(8)),
-                      child: Text('Current: ${setting.activeAcademicYear}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF065F46))),
-                    ),
+                    const Text('Auto-Suggest:', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                    _buildYearSuggestChip('2025-2026'),
+                    _buildYearSuggestChip('2026-2027'),
+                    _buildYearSuggestChip('2027-2028'),
+                    _buildYearSuggestChip('2028-2029'),
                   ],
                 ),
                 const SizedBox(height: 14),
+
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       flex: 2,
                       child: TextField(
-                        controller: yearCtrl,
-                        decoration: const InputDecoration(labelText: 'Academic Year (e.g. 2026-2027)', border: OutlineInputBorder()),
+                        controller: _yearLabelCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Academic Year Label *',
+                          hintText: 'e.g. 2026-2027',
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _yearStartMonth,
+                        decoration: const InputDecoration(labelText: 'Start Month', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 14)),
+                        items: months.map((m) => DropdownMenuItem(value: m, child: Text(m, style: const TextStyle(fontSize: 12.5)))).toList(),
+                        onChanged: (v) => setState(() => _yearStartMonth = v ?? 'June'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _yearEndMonth,
+                        decoration: const InputDecoration(labelText: 'End Month', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 14)),
+                        items: months.map((m) => DropdownMenuItem(value: m, child: Text(m, style: const TextStyle(fontSize: 12.5)))).toList(),
+                        onChanged: (v) => setState(() => _yearEndMonth = v ?? 'March'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _yearStatus,
+                        decoration: const InputDecoration(labelText: 'Status', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 14)),
+                        items: const [
+                          DropdownMenuItem(value: 'active', child: Text('Active', style: TextStyle(fontSize: 12.5))),
+                          DropdownMenuItem(value: 'current', child: Text('Current Working', style: TextStyle(fontSize: 12.5))),
+                          DropdownMenuItem(value: 'archived', child: Text('Archived', style: TextStyle(fontSize: 12.5))),
+                        ],
+                        onChanged: (v) => setState(() => _yearStatus = v ?? 'active'),
                       ),
                     ),
                     const SizedBox(width: 10),
                     ElevatedButton.icon(
                       onPressed: () async {
-                        final val = yearCtrl.text.trim();
+                        final val = _yearLabelCtrl.text.trim();
                         if (RegExp(r'^\d{4}-\d{4}$').hasMatch(val)) {
-                          await provider.addAcademicYear(AcademicYearConfig(label: val, startMonth: startMonth, endMonth: endMonth, status: status));
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Academic Year $val saved!')));
+                          await provider.addAcademicYear(AcademicYearConfig(
+                            label: val,
+                            startMonth: _yearStartMonth,
+                            endMonth: _yearEndMonth,
+                            status: _yearStatus,
+                          ));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Academic Year "$val" saved successfully!'), backgroundColor: const Color(0xFF059669)),
+                          );
                         } else {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid format! Must be YYYY-YYYY (e.g. 2026-2027)')));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Invalid year format! Must be YYYY-YYYY (e.g. 2026-2027)'), backgroundColor: Colors.red),
+                          );
                         }
                       },
-                      icon: const Icon(Icons.add, size: 16),
-                      label: const Text('Add Year'),
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF059669), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16)),
+                      icon: const Icon(Icons.add_rounded, size: 16),
+                      label: const Text('Save Year'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF059669),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
                     ),
                   ],
                 ),
@@ -678,77 +1021,132 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
           const SizedBox(height: 20),
 
           // Configured Years List
-          const Text('Configured Academic Years', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-          const SizedBox(height: 10),
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: provider.academicYears.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (ctx, idx) {
-              final y = provider.academicYears[idx];
-              final isCurrent = y.label == setting.activeAcademicYear || y.status == 'current';
-              return Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: isCurrent ? const Color(0xFF6EE7B7) : const Color(0xFFE2E8F0)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.calendar_today_rounded, size: 18, color: isCurrent ? const Color(0xFF059669) : Colors.blue.shade600),
-                        const SizedBox(width: 12),
-                        Text(y.label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                        const SizedBox(width: 10),
-                        if (isCurrent)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(6)),
-                            child: const Text('CURRENT WORKING YEAR', style: TextStyle(color: Color(0xFF065F46), fontSize: 10, fontWeight: FontWeight.bold)),
-                          ),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        if (!isCurrent)
-                          OutlinedButton(
-                            onPressed: () => provider.setWorkingAcademicYear(y.label),
-                            child: const Text('Set as Current', style: TextStyle(fontSize: 12)),
-                          ),
-                        const SizedBox(width: 6),
-                        IconButton(
-                          icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF2563EB)),
-                          tooltip: 'Edit Academic Year',
-                          onPressed: () => _showEditAcademicYearModal(y, provider),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                          tooltip: 'Delete Academic Year',
-                          onPressed: () async {
-                            final confirmed = await _confirmAction(
-                              context,
-                              title: 'Delete Academic Year',
-                              message: 'Are you sure you want to permanently delete academic year "${y.label}"? Enrolled student associations may be affected.',
-                              confirmLabel: 'Delete Year',
-                            );
-                            if (confirmed) {
-                              await provider.deleteAcademicYear(y.label);
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Academic Year "${y.label}" deleted.')));
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              );
-            },
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Configured Academic Sessions (${provider.academicYears.length})', style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+              const Text('Active session updates student defaults automatically', style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B), fontStyle: FontStyle.italic)),
+            ],
           ),
+          const SizedBox(height: 10),
+
+          if (provider.academicYears.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(30),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
+              child: const Center(child: Text('No academic years configured yet. Please configure the first year above.')),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: provider.academicYears.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (ctx, idx) {
+                final y = provider.academicYears[idx];
+                final isCurrent = y.label == setting.activeAcademicYear || y.status == 'current';
+                return Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: isCurrent ? const Color(0xFF6EE7B7) : const Color(0xFFE2E8F0)),
+                    boxShadow: AppColors.cardShadow,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.calendar_month_rounded, size: 20, color: isCurrent ? const Color(0xFF059669) : const Color(0xFF2563EB)),
+                          const SizedBox(width: 12),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(y.label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5, color: Color(0xFF0F172A))),
+                                  const SizedBox(width: 8),
+                                  if (isCurrent)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(6)),
+                                      child: const Text('CURRENT WORKING YEAR', style: TextStyle(color: Color(0xFF065F46), fontSize: 10, fontWeight: FontWeight.bold)),
+                                    )
+                                  else if (y.status == 'archived')
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(6)),
+                                      child: const Text('ARCHIVED', style: TextStyle(color: Color(0xFF64748B), fontSize: 10, fontWeight: FontWeight.bold)),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              Text('Term Period: ${y.startMonth} to ${y.endMonth} • Status: ${y.status.toUpperCase()}', style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
+                            ],
+                          ),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          if (!isCurrent)
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF2563EB),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                              ),
+                              onPressed: () async {
+                                await provider.setWorkingAcademicYear(y.label);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Active working academic year switched to "${y.label}"!'), backgroundColor: const Color(0xFF059669)),
+                                );
+                              },
+                              child: const Text('Set as Active', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            ),
+                          const SizedBox(width: 6),
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF2563EB)),
+                            tooltip: 'Edit Academic Year',
+                            onPressed: () => _showEditAcademicYearModal(y, provider),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                            tooltip: 'Delete Academic Year',
+                            onPressed: () async {
+                              final confirmed = await _confirmAction(
+                                context,
+                                title: 'Delete Academic Year',
+                                message: 'Are you sure you want to delete academic year "${y.label}"? Enrolled student associations and records may be affected.',
+                                confirmLabel: 'Delete Year',
+                              );
+                              if (confirmed) {
+                                await provider.deleteAcademicYear(y.label);
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Academic Year "${y.label}" deleted.')));
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildYearSuggestChip(String year) {
+    return InkWell(
+      onTap: () => setState(() => _yearLabelCtrl.text = year),
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(6), border: Border.all(color: const Color(0xFFCBD5E1))),
+        child: Text(year, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
       ),
     );
   }
@@ -757,7 +1155,7 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
     String startMonth = y.startMonth;
     String endMonth = y.endMonth;
     String status = y.status;
-    final months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
     showDialog(
       context: context,
@@ -788,6 +1186,7 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                 decoration: const InputDecoration(labelText: 'Status', border: OutlineInputBorder()),
                 items: const [
                   DropdownMenuItem(value: 'active', child: Text('Active')),
+                  DropdownMenuItem(value: 'current', child: Text('Current Working')),
                   DropdownMenuItem(value: 'archived', child: Text('Archived')),
                 ],
                 onChanged: (v) => setDlg(() => status = v ?? 'active'),
@@ -806,6 +1205,9 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                   status: status,
                 );
                 await provider.addAcademicYear(updated);
+                if (status == 'current') {
+                  await provider.setWorkingAcademicYear(y.label);
+                }
                 Navigator.pop(ctx);
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Academic Year "${y.label}" updated!')));
               },
@@ -819,89 +1221,274 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
 
   // 1C. STAFF DIRECTORY
   Widget _buildStaffDirectoryTab(InstitutionProvider provider) {
-    return ListView(
+    final query = _staffSearchCtrl.text.trim().toLowerCase();
+    final filtered = provider.staffList.where((st) {
+      if (_staffRoleFilter != 'ALL' && st.role != _staffRoleFilter) return false;
+      if (query.isNotEmpty) {
+        final m = st.name.toLowerCase().contains(query) ||
+            st.phone.contains(query) ||
+            st.email.toLowerCase().contains(query) ||
+            st.designation.toLowerCase().contains(query);
+        if (!m) return false;
+      }
+      return true;
+    }).toList();
+
+    return Padding(
       padding: const EdgeInsets.all(20),
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('Active Staff & Faculty (${provider.staffList.length})', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-            ElevatedButton.icon(
-              onPressed: () => setState(() {
-                _currentModuleIndex = 0;
-                _currentSubIndex = 3;
-              }),
-              icon: const Icon(Icons.add, size: 16),
-              label: const Text('Add Staff'),
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        if (provider.staffList.isEmpty)
-          const Center(child: Padding(padding: EdgeInsets.all(30), child: Text('No staff members registered yet.')))
-        else
-          ...provider.staffList.map((st) => Container(
-            margin: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        children: [
+          // Toolbar Card
+          Container(
             padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: AppColors.cardShadow,
+            ),
             child: Row(
               children: [
-                CircleAvatar(
-                  backgroundColor: Colors.blue.shade100,
-                  child: Text(st.name.isNotEmpty ? st.name[0].toUpperCase() : 'U', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue.shade900)),
-                ),
-                const SizedBox(width: 14),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(st.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(4)),
-                            child: Text(st.role, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blue.shade800)),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text('Assigned: ${st.assignedClass.isNotEmpty ? st.assignedClass : 'All Classes'} • Ph: ${st.phone} • Email: ${st.email}', style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
-                    ],
+                  flex: 3,
+                  child: TextField(
+                    controller: _staffSearchCtrl,
+                    decoration: const InputDecoration(
+                      hintText: 'Search staff by name, phone, designation...',
+                      prefixIcon: Icon(Icons.search, size: 18),
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    ),
+                    onChanged: (_) => setState(() {}),
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF2563EB)),
-                  tooltip: 'Edit Profile & Access',
-                  onPressed: () => _showEditStaffModal(st, provider),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 2,
+                  child: DropdownButtonFormField<String>(
+                    value: _staffRoleFilter,
+                    decoration: const InputDecoration(
+                      labelText: 'Role Filter',
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'ALL', child: Text('All Roles', style: TextStyle(fontSize: 12.5))),
+                      DropdownMenuItem(value: 'TEACHER', child: Text('Teachers / Ustad', style: TextStyle(fontSize: 12.5))),
+                      DropdownMenuItem(value: 'ADMIN', child: Text('Administrators', style: TextStyle(fontSize: 12.5))),
+                      DropdownMenuItem(value: 'COLLECTOR', child: Text('Cashier / Collectors', style: TextStyle(fontSize: 12.5))),
+                    ],
+                    onChanged: (v) => setState(() => _staffRoleFilter = v ?? 'ALL'),
+                  ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.assignment_ind_rounded, size: 18, color: Color(0xFF059669)),
-                  tooltip: 'Assign Duty Classes & UPI Account',
-                  onPressed: () => _showDutyModal(st, provider),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                  tooltip: 'Delete Staff Member',
-                  onPressed: () async {
-                    final confirmed = await _confirmAction(
-                      context,
-                      title: 'Delete Staff Member',
-                      message: 'Are you sure you want to permanently remove faculty member "${st.name}"? Their login sessions and portal access will be revoked.',
-                      confirmLabel: 'Delete Staff',
-                    );
-                    if (confirmed) {
-                      await provider.deleteStaff(st.id);
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Staff "${st.name}" deleted.')));
-                    }
-                  },
+                const SizedBox(width: 10),
+                ElevatedButton.icon(
+                  onPressed: () => setState(() {
+                    _currentModuleIndex = 0;
+                    _currentSubIndex = 3;
+                  }),
+                  icon: const Icon(Icons.person_add_rounded, size: 16),
+                  label: const Text('Add Staff'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
                 ),
               ],
             ),
-          )),
-      ],
+          ),
+          const SizedBox(height: 14),
+
+          // Staff List View
+          Expanded(
+            child: filtered.isEmpty
+                ? Container(
+                    padding: const EdgeInsets.all(40),
+                    alignment: Alignment.center,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.badge_outlined, size: 48, color: Color(0xFF94A3B8)),
+                        const SizedBox(height: 12),
+                        const Text('No faculty or staff matching your query.', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                        const SizedBox(height: 4),
+                        const Text('Adjust your role filter or register a new staff member.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                      ],
+                    ),
+                  )
+                : ListView.separated(
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (ctx, idx) {
+                      final st = filtered[idx];
+                      final roleColor = st.role == 'ADMIN'
+                          ? const Color(0xFFD97706)
+                          : (st.role == 'COLLECTOR' ? const Color(0xFF059669) : const Color(0xFF2563EB));
+                      final assignedList = st.assignedClasses.isNotEmpty
+                          ? st.assignedClasses
+                          : (st.assignedClass.isNotEmpty ? st.assignedClass.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList() : <String>[]);
+
+                      return Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          boxShadow: AppColors.cardShadow,
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            CircleAvatar(
+                              radius: 24,
+                              backgroundColor: roleColor.withOpacity(0.12),
+                              child: Text(
+                                st.name.isNotEmpty ? st.name[0].toUpperCase() : 'U',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: roleColor),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(st.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5, color: Color(0xFF0F172A))),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                        decoration: BoxDecoration(color: roleColor.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
+                                        child: Text(st.role, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: roleColor)),
+                                      ),
+                                      if (st.designation.isNotEmpty) ...[
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(6)),
+                                          child: Text(st.designation, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                                        ),
+                                      ],
+                                      if (st.samasthaRegNo.isNotEmpty) ...[
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(6)),
+                                          child: Text('Reg: ${st.samasthaRegNo}', style: const TextStyle(fontSize: 10, color: Color(0xFF1D4ED8), fontWeight: FontWeight.w600)),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.phone_rounded, size: 13, color: Color(0xFF64748B)),
+                                      const SizedBox(width: 4),
+                                      Text(st.phone.isNotEmpty ? st.phone : 'No Phone', style: const TextStyle(fontSize: 11.5, color: Color(0xFF475569))),
+                                      const SizedBox(width: 14),
+                                      const Icon(Icons.email_outlined, size: 13, color: Color(0xFF64748B)),
+                                      const SizedBox(width: 4),
+                                      Text(st.email.isNotEmpty ? st.email : 'No Email', style: const TextStyle(fontSize: 11.5, color: Color(0xFF475569))),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+
+                                  // Assigned Classes Wrap
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                    children: [
+                                      const Text('Assigned: ', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                                      if (assignedList.isEmpty)
+                                        const Text('All Classes', style: TextStyle(fontSize: 11.5, color: Color(0xFF0F172A), fontWeight: FontWeight.w600))
+                                      else
+                                        Wrap(
+                                          spacing: 6,
+                                          runSpacing: 4,
+                                          children: assignedList.map((c) => Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(4), border: Border.all(color: const Color(0xFFBFDBFE))),
+                                            child: Text(c, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF1E40AF))),
+                                          )).toList(),
+                                        ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+
+                                  // 4-Portal Access Badges
+                                  Wrap(
+                                    spacing: 6,
+                                    runSpacing: 4,
+                                    children: [
+                                      _buildAccessBadge('Fees', st.hasCollectionAccess, const Color(0xFF059669)),
+                                      _buildAccessBadge('Worksheet', st.hasWorksheetAccess, const Color(0xFF2563EB)),
+                                      _buildAccessBadge('Results', st.hasResultAccess, const Color(0xFF7C3AED)),
+                                      _buildAccessBadge('Admin', st.hasAdminAccess, const Color(0xFFD97706)),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // Actions
+                            Column(
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.edit_outlined, size: 19, color: Color(0xFF2563EB)),
+                                  tooltip: 'Edit Profile & Portal Access',
+                                  onPressed: () => _showEditStaffModal(st, provider),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.assignment_ind_rounded, size: 19, color: Color(0xFF059669)),
+                                  tooltip: 'Assign Duty Classes & UPI Account',
+                                  onPressed: () => _showDutyModal(st, provider),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline, size: 19, color: Colors.red),
+                                  tooltip: 'Delete Staff Member',
+                                  onPressed: () async {
+                                    final confirmed = await _confirmAction(
+                                      context,
+                                      title: 'Delete Staff Member',
+                                      message: 'Are you sure you want to permanently remove faculty member "${st.name}"? All assigned access and login credentials will be revoked.',
+                                      confirmLabel: 'Delete Staff',
+                                    );
+                                    if (confirmed) {
+                                      await provider.deleteStaff(st.id);
+                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Staff member "${st.name}" deleted.')));
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAccessBadge(String label, bool isGranted, Color activeColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: isGranted ? activeColor.withOpacity(0.1) : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: isGranted ? activeColor.withOpacity(0.3) : const Color(0xFFCBD5E1)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(isGranted ? Icons.check_circle_rounded : Icons.cancel_outlined, size: 11, color: isGranted ? activeColor : const Color(0xFF94A3B8)),
+          const SizedBox(width: 4),
+          Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isGranted ? activeColor : const Color(0xFF94A3B8))),
+        ],
+      ),
     );
   }
 
@@ -922,45 +1509,82 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocal) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('Edit Staff: ${st.name}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          title: Row(
+            children: [
+              const Icon(Icons.badge_rounded, color: Color(0xFF2563EB), size: 22),
+              const SizedBox(width: 8),
+              Expanded(child: Text('Edit Staff Profile: ${st.name}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+            ],
+          ),
           content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Full Name *', border: OutlineInputBorder())),
-                const SizedBox(height: 10),
-                DropdownButtonFormField<String>(
-                  value: ['TEACHER', 'ADMIN', 'COLLECTOR'].contains(role) ? role : 'TEACHER',
-                  decoration: const InputDecoration(labelText: 'Staff Role *', border: OutlineInputBorder()),
-                  items: const [
-                    DropdownMenuItem(value: 'TEACHER', child: Text('Teacher / Ustad')),
-                    DropdownMenuItem(value: 'ADMIN', child: Text('Administrator')),
-                    DropdownMenuItem(value: 'COLLECTOR', child: Text('Cashier / Fee Collector')),
-                  ],
-                  onChanged: (val) => setLocal(() => role = val ?? 'TEACHER'),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(child: TextField(controller: desigCtrl, decoration: const InputDecoration(labelText: 'Designation', border: OutlineInputBorder()))),
-                    const SizedBox(width: 8),
-                    Expanded(child: TextField(controller: samasthaCtrl, decoration: const InputDecoration(labelText: 'Samastha Reg #', border: OutlineInputBorder()))),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                TextField(controller: phoneCtrl, decoration: const InputDecoration(labelText: 'Phone / WhatsApp', border: OutlineInputBorder())),
-                const SizedBox(height: 10),
-                TextField(controller: emailCtrl, decoration: const InputDecoration(labelText: 'Email Address', border: OutlineInputBorder())),
-                const SizedBox(height: 16),
+            child: SizedBox(
+              width: 500,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Full Name *', border: OutlineInputBorder())),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    value: ['TEACHER', 'ADMIN', 'COLLECTOR'].contains(role) ? role : 'TEACHER',
+                    decoration: const InputDecoration(labelText: 'Staff Role *', border: OutlineInputBorder()),
+                    items: const [
+                      DropdownMenuItem(value: 'TEACHER', child: Text('Teacher / Faculty')),
+                      DropdownMenuItem(value: 'ADMIN', child: Text('Administrator')),
+                      DropdownMenuItem(value: 'COLLECTOR', child: Text('Cashier / Fee Collector')),
+                    ],
+                    onChanged: (val) => setLocal(() => role = val ?? 'TEACHER'),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(child: TextField(controller: desigCtrl, decoration: const InputDecoration(labelText: 'Designation (e.g. Swadar, Headmaster)', border: OutlineInputBorder()))),
+                      const SizedBox(width: 8),
+                      Expanded(child: TextField(controller: samasthaCtrl, decoration: const InputDecoration(labelText: 'Samastha Reg # (Optional)', border: OutlineInputBorder()))),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(child: TextField(controller: phoneCtrl, decoration: const InputDecoration(labelText: 'Phone / WhatsApp *', border: OutlineInputBorder()))),
+                      const SizedBox(width: 8),
+                      Expanded(child: TextField(controller: emailCtrl, decoration: const InputDecoration(labelText: 'Email Address *', border: OutlineInputBorder()))),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
 
-                const Text('4-Portal Access Permissions', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
-                const SizedBox(height: 6),
-                CheckboxListTile(value: canCollect, onChanged: (v) => setLocal(() => canCollect = v ?? true), title: const Text('Fee Collection Access', style: TextStyle(fontSize: 12))),
-                CheckboxListTile(value: canWorksheet, onChanged: (v) => setLocal(() => canWorksheet = v ?? true), title: const Text('Worksheet Access', style: TextStyle(fontSize: 12))),
-                CheckboxListTile(value: canResults, onChanged: (v) => setLocal(() => canResults = v ?? false), title: const Text('Results Access', style: TextStyle(fontSize: 12))),
-                CheckboxListTile(value: canAdmin, onChanged: (v) => setLocal(() => canAdmin = v ?? false), title: const Text('Admin Panel Access', style: TextStyle(fontSize: 12))),
-              ],
+                  const Text('4-Portal Access Control Permissions', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
+                  const SizedBox(height: 6),
+                  CheckboxListTile(
+                    value: canCollect,
+                    dense: true,
+                    onChanged: (v) => setLocal(() => canCollect = v ?? true),
+                    title: const Text('1. Fee Collection & Receipts Portal', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                    subtitle: const Text('Allows collecting dues and issuing receipts', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                  ),
+                  CheckboxListTile(
+                    value: canWorksheet,
+                    dense: true,
+                    onChanged: (v) => setLocal(() => canWorksheet = v ?? true),
+                    title: const Text('2. Class Worksheet & Daily Attendance', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                    subtitle: const Text('Allows marking attendance and grade sheets', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                  ),
+                  CheckboxListTile(
+                    value: canResults,
+                    dense: true,
+                    onChanged: (v) => setLocal(() => canResults = v ?? false),
+                    title: const Text('3. Result Management System', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                    subtitle: const Text('Allows entering exam scores and publishing results', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                  ),
+                  CheckboxListTile(
+                    value: canAdmin,
+                    dense: true,
+                    onChanged: (v) => setLocal(() => canAdmin = v ?? false),
+                    title: const Text('4. Admin Command Center', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                    subtitle: const Text('Allows full institution settings and data controls', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                  ),
+                ],
+              ),
             ),
           ),
           actions: [
@@ -983,7 +1607,7 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                 );
                 await provider.updateStaff(updated);
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Staff "${updated.name}" updated successfully!')));
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Staff member "${updated.name}" updated successfully!'), backgroundColor: const Color(0xFF059669)));
               },
               child: const Text('Save Changes'),
             ),
@@ -996,60 +1620,82 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
   void _showDutyModal(Staff st, InstitutionProvider provider) {
     final accCtrl = TextEditingController(text: st.upiAccountName);
     final upiCtrl = TextEditingController(text: st.upiId);
-    final assignedClasses = Set<String>.from(st.assignedClasses.isNotEmpty ? st.assignedClasses : [st.assignedClass]);
+    final assignedClasses = Set<String>.from(
+      st.assignedClasses.isNotEmpty
+          ? st.assignedClasses
+          : (st.assignedClass.isNotEmpty ? st.assignedClass.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty) : <String>[]),
+    );
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDlgState) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('Assign Duties: ${st.name}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          title: Row(
+            children: [
+              const Icon(Icons.assignment_ind_rounded, color: Color(0xFF059669), size: 22),
+              const SizedBox(width: 8),
+              Expanded(child: Text('Assign Duties: ${st.name}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+            ],
+          ),
           content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('1. Assigned Duty Classes (Multiple Selection)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: provider.classes.map((c) {
-                    final isSel = assignedClasses.contains(c);
-                    return FilterChip(
-                      selected: isSel,
-                      label: Text(c, style: TextStyle(fontSize: 11, fontWeight: isSel ? FontWeight.bold : FontWeight.normal)),
-                      onSelected: (val) {
-                        setDlgState(() {
-                          if (val) assignedClasses.add(c); else assignedClasses.remove(c);
-                        });
-                      },
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 16),
-                const Text('2. UPI / Cashier Account (For Student Payments)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                const SizedBox(height: 8),
-                TextField(controller: accCtrl, decoration: const InputDecoration(labelText: 'Account Holder Name', border: OutlineInputBorder())),
-                const SizedBox(height: 8),
-                TextField(controller: upiCtrl, decoration: const InputDecoration(labelText: 'UPI ID (e.g. name@okhdfcbank)', border: OutlineInputBorder())),
-              ],
+            child: SizedBox(
+              width: 500,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('1. Assigned Duty Classes (Multiple Selection)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                  const SizedBox(height: 4),
+                  const Text('Class teachers can record attendance and enter marks for these classes.', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: provider.classes.map((c) {
+                      final isSel = assignedClasses.contains(c);
+                      return FilterChip(
+                        selected: isSel,
+                        selectedColor: const Color(0xFFDBEAFE),
+                        checkmarkColor: const Color(0xFF1D4ED8),
+                        label: Text(c, style: TextStyle(fontSize: 12, fontWeight: isSel ? FontWeight.bold : FontWeight.normal, color: isSel ? const Color(0xFF1E40AF) : const Color(0xFF334155))),
+                        onSelected: (val) {
+                          setDlgState(() {
+                            if (val) assignedClasses.add(c); else assignedClasses.remove(c);
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 20),
+
+                  const Text('2. Personal UPI Cashier Account (Optional)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                  const SizedBox(height: 4),
+                  const Text('When this staff member accepts fee payments, their UPI QR can be rendered for payments.', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                  const SizedBox(height: 10),
+                  TextField(controller: accCtrl, decoration: const InputDecoration(labelText: 'Account Holder Name', hintText: 'e.g. Sanjid Ustad', border: OutlineInputBorder())),
+                  const SizedBox(height: 10),
+                  TextField(controller: upiCtrl, decoration: const InputDecoration(labelText: 'UPI ID (VPA)', hintText: 'e.g. 9876543210@okaxis', border: OutlineInputBorder())),
+                ],
+              ),
             ),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
             ElevatedButton(
-              onPressed: () {
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF059669), foregroundColor: Colors.white),
+              onPressed: () async {
                 final updated = st.copyWith(
                   assignedClass: assignedClasses.join(', '),
                   assignedClasses: assignedClasses.toList(),
                   upiAccountName: accCtrl.text.trim(),
                   upiId: upiCtrl.text.trim(),
                 );
-                provider.updateStaff(updated);
+                await provider.updateStaff(updated);
                 Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Duties and UPI account for "${st.name}" updated!'), backgroundColor: const Color(0xFF059669)));
               },
-              child: const Text('Save Duties'),
+              child: const Text('Save Duties & Account'),
             ),
           ],
         ),
@@ -1059,203 +1705,550 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
 
   // 1D. ADD STAFF & CATEGORIES
   Widget _buildAddStaffTab(InstitutionProvider provider) {
-    final nameCtrl = TextEditingController();
-    final desigCtrl = TextEditingController(text: 'TEACHER');
-    final samasthaCtrl = TextEditingController();
-    final phoneCtrl = TextEditingController();
-    final emailCtrl = TextEditingController();
-    String role = 'TEACHER';
-    bool canCollect = true;
-    bool canWorksheet = true;
-    bool canResults = false;
-    bool canAdmin = false;
-    bool actAsSuperAdmin = false;
-
-    return StatefulBuilder(
-      builder: (ctx, setLocal) => SingleChildScrollView(
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Container(
         padding: const EdgeInsets.all(20),
-        child: Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Add New Faculty / Staff Member', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(child: TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Full Name *', border: OutlineInputBorder()))),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: role,
-                      decoration: const InputDecoration(labelText: 'Staff Role *', border: OutlineInputBorder()),
-                      items: const [
-                        DropdownMenuItem(value: 'TEACHER', child: Text('Teacher / Ustad')),
-                        DropdownMenuItem(value: 'ADMIN', child: Text('Administrator')),
-                        DropdownMenuItem(value: 'COLLECTOR', child: Text('Cashier / Fee Collector')),
-                      ],
-                      onChanged: (val) => setLocal(() => role = val ?? 'TEACHER'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(child: TextField(controller: desigCtrl, decoration: const InputDecoration(labelText: 'Designation (e.g. SWADAR, USTAD)', border: OutlineInputBorder()))),
-                  const SizedBox(width: 10),
-                  Expanded(child: TextField(controller: samasthaCtrl, decoration: const InputDecoration(labelText: 'Samastha Reg. No (Optional)', border: OutlineInputBorder()))),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(child: TextField(controller: phoneCtrl, decoration: const InputDecoration(labelText: 'Phone / WhatsApp *', border: OutlineInputBorder()))),
-                  const SizedBox(width: 10),
-                  Expanded(child: TextField(controller: emailCtrl, decoration: const InputDecoration(labelText: 'Email Address *', border: OutlineInputBorder()))),
-                ],
-              ),
-              const SizedBox(height: 18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+          boxShadow: AppColors.cardShadow,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: const [
+                    Icon(Icons.person_add_alt_1_rounded, color: Color(0xFF2563EB), size: 22),
+                    SizedBox(width: 8),
+                    Text('Register Faculty / Staff Member', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                  ],
+                ),
+                TextButton.icon(
+                  onPressed: () => setState(() {
+                    _currentModuleIndex = 0;
+                    _currentSubIndex = 2;
+                  }),
+                  icon: const Icon(Icons.arrow_back_rounded, size: 16),
+                  label: const Text('Back to Directory'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            const Text('Configure staff profile, duty classes, and granular 4-portal access permissions.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+            const Divider(height: 24),
 
-              // 4-PORTAL PERMISSIONS
-              const Text('4-Portal Access Permissions', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
-              const SizedBox(height: 8),
-              CheckboxListTile(value: canCollect, onChanged: (v) => setLocal(() => canCollect = v ?? true), title: const Text('1. Fee Collection Access', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold))),
-              CheckboxListTile(value: canWorksheet, onChanged: (v) => setLocal(() => canWorksheet = v ?? true), title: const Text('2. Class Worksheet Access', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold))),
-              CheckboxListTile(value: canResults, onChanged: (v) => setLocal(() => canResults = v ?? false), title: const Text('3. Result Portal Access', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold))),
-              CheckboxListTile(value: canAdmin, onChanged: (v) => setLocal(() => canAdmin = v ?? false), title: const Text('4. Admin Panel Access', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold))),
-              if (canAdmin)
-                Padding(
-                  padding: const EdgeInsets.only(left: 20),
-                  child: CheckboxListTile(value: actAsSuperAdmin, onChanged: (v) => setLocal(() => actAsSuperAdmin = v ?? false), title: const Text('Act like Super Administrator (Full Control)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.amber))),
-                ),
-              const SizedBox(height: 16),
-              Align(
-                alignment: Alignment.centerRight,
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    if (nameCtrl.text.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter Staff Name!')));
-                      return;
-                    }
-                    final st = Staff(
-                      id: 'st_${DateTime.now().millisecondsSinceEpoch}',
-                      name: nameCtrl.text.trim(),
-                      role: role,
-                      designation: desigCtrl.text.trim(),
-                      samasthaRegNo: samasthaCtrl.text.trim(),
-                      phone: phoneCtrl.text.trim(),
-                      email: emailCtrl.text.trim(),
-                      hasCollectionAccess: canCollect,
-                      hasWorksheetAccess: canWorksheet,
-                      hasResultAccess: canResults,
-                      hasAdminAccess: canAdmin,
-                    );
-                    await provider.addStaff(st);
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Staff ${st.name} registered successfully!')));
-                    setState(() {
-                      _currentModuleIndex = 0;
-                      _currentSubIndex = 2;
-                    });
-                  },
-                  icon: const Icon(Icons.person_add_rounded, size: 16),
-                  label: const Text('Register Staff Member'),
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14)),
+            // Two-column layout
+            LayoutBuilder(
+              builder: (ctx, constraints) {
+                final isWide = constraints.maxWidth >= 760;
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Left Column: Identity & Details
+                    Expanded(
+                      flex: isWide ? 1 : 1,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('1. Staff Profile & Contact Information', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                          const SizedBox(height: 12),
+
+                          TextField(
+                            controller: _addStaffNameCtrl,
+                            decoration: const InputDecoration(labelText: 'Full Staff Name *', hintText: 'e.g. USTAD AHMAD K', border: OutlineInputBorder()),
+                          ),
+                          const SizedBox(height: 12),
+
+                          Row(
+                            children: [
+                              Expanded(
+                                child: DropdownButtonFormField<String>(
+                                  value: _addStaffRole,
+                                  decoration: const InputDecoration(labelText: 'Role *', border: OutlineInputBorder()),
+                                  items: const [
+                                    DropdownMenuItem(value: 'TEACHER', child: Text('Teacher / Faculty')),
+                                    DropdownMenuItem(value: 'ADMIN', child: Text('Administrator')),
+                                    DropdownMenuItem(value: 'COLLECTOR', child: Text('Cashier / Fee Collector')),
+                                  ],
+                                  onChanged: (val) => setState(() => _addStaffRole = val ?? 'TEACHER'),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: TextField(
+                                  controller: _addStaffDesigCtrl,
+                                  decoration: const InputDecoration(labelText: 'Designation', hintText: 'e.g. Swadar, Headmaster', border: OutlineInputBorder()),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _addStaffPhoneCtrl,
+                                  keyboardType: TextInputType.phone,
+                                  decoration: const InputDecoration(labelText: 'Phone / WhatsApp *', hintText: 'e.g. 9876543210', border: OutlineInputBorder()),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: TextField(
+                                  controller: _addStaffEmailCtrl,
+                                  keyboardType: TextInputType.emailAddress,
+                                  decoration: const InputDecoration(labelText: 'Email Address *', hintText: 'e.g. staff@school.com', border: OutlineInputBorder()),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+
+                          TextField(
+                            controller: _addStaffSamasthaCtrl,
+                            decoration: const InputDecoration(labelText: 'Samastha / Board Registration # (Optional)', hintText: 'e.g. REG-88321', border: OutlineInputBorder()),
+                          ),
+                          const SizedBox(height: 16),
+
+                          const Text('Optional UPI Account Details', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(child: TextField(controller: _addStaffUpiAccCtrl, decoration: const InputDecoration(labelText: 'UPI Account Holder Name', border: OutlineInputBorder()))),
+                              const SizedBox(width: 10),
+                              Expanded(child: TextField(controller: _addStaffUpiIdCtrl, decoration: const InputDecoration(labelText: 'UPI ID (VPA)', border: OutlineInputBorder()))),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 24),
+
+                    // Right Column: Assigned Classes & 4-Portal Access
+                    Expanded(
+                      flex: isWide ? 1 : 1,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('2. Assigned Duty Classes', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                          const SizedBox(height: 6),
+                          const Text('Select classes where this teacher holds academic jurisdiction.', style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: provider.classes.map((c) {
+                              final isSel = _addStaffAssignedClasses.contains(c);
+                              return FilterChip(
+                                selected: isSel,
+                                selectedColor: const Color(0xFFDBEAFE),
+                                checkmarkColor: const Color(0xFF1D4ED8),
+                                label: Text(c, style: TextStyle(fontSize: 12, fontWeight: isSel ? FontWeight.bold : FontWeight.normal, color: isSel ? const Color(0xFF1E40AF) : const Color(0xFF334155))),
+                                onSelected: (val) {
+                                  setState(() {
+                                    if (val) _addStaffAssignedClasses.add(c); else _addStaffAssignedClasses.remove(c);
+                                  });
+                                },
+                              );
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 20),
+
+                          const Text('3. 4-Portal Access Security Permissions', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
+                          const SizedBox(height: 6),
+                          const Text('Granularly grant or restrict portal access to this staff member.', style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
+                          const SizedBox(height: 10),
+
+                          CheckboxListTile(
+                            value: _addStaffCanCollect,
+                            dense: true,
+                            onChanged: (v) => setState(() => _addStaffCanCollect = v ?? true),
+                            title: const Text('1. Fee Collection & Receipts', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                            subtitle: const Text('Collect fees, print receipts, view daily registers', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                          ),
+                          CheckboxListTile(
+                            value: _addStaffCanWorksheet,
+                            dense: true,
+                            onChanged: (v) => setState(() => _addStaffCanWorksheet = v ?? true),
+                            title: const Text('2. Worksheet & Attendance Portal', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                            subtitle: const Text('Mark daily attendance, generate class registers', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                          ),
+                          CheckboxListTile(
+                            value: _addStaffCanResults,
+                            dense: true,
+                            onChanged: (v) => setState(() => _addStaffCanResults = v ?? false),
+                            title: const Text('3. Result Management System', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                            subtitle: const Text('Enter marks, grade exams, promote cohorts', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                          ),
+                          CheckboxListTile(
+                            value: _addStaffCanAdmin,
+                            dense: true,
+                            onChanged: (v) => setState(() => _addStaffCanAdmin = v ?? false),
+                            title: const Text('4. Admin Command Center', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                            subtitle: const Text('Full institution settings, student management, security', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                          ),
+                          if (_addStaffCanAdmin)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 20),
+                              child: CheckboxListTile(
+                                value: _addStaffActAsSuperAdmin,
+                                dense: true,
+                                onChanged: (v) => setState(() => _addStaffActAsSuperAdmin = v ?? false),
+                                title: const Text('Super Administrator Privileges', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFD97706))),
+                                subtitle: const Text('Unlocks master credentials, cloud restores, audit wipes', style: TextStyle(fontSize: 10.5, color: Color(0xFFB45309))),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+            const Divider(height: 28),
+
+            Align(
+              alignment: Alignment.centerRight,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  final name = _addStaffNameCtrl.text.trim();
+                  final phone = _addStaffPhoneCtrl.text.trim();
+                  if (name.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter Staff Name!'), backgroundColor: Colors.red));
+                    return;
+                  }
+                  if (phone.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter Phone Number!'), backgroundColor: Colors.red));
+                    return;
+                  }
+
+                  final newStaff = Staff(
+                    id: 'st_${DateTime.now().millisecondsSinceEpoch}',
+                    name: name,
+                    role: _addStaffRole,
+                    designation: _addStaffDesigCtrl.text.trim(),
+                    samasthaRegNo: _addStaffSamasthaCtrl.text.trim(),
+                    phone: phone,
+                    email: _addStaffEmailCtrl.text.trim(),
+                    assignedClass: _addStaffAssignedClasses.join(', '),
+                    assignedClasses: _addStaffAssignedClasses.toList(),
+                    upiAccountName: _addStaffUpiAccCtrl.text.trim(),
+                    upiId: _addStaffUpiIdCtrl.text.trim(),
+                    hasCollectionAccess: _addStaffCanCollect,
+                    hasWorksheetAccess: _addStaffCanWorksheet,
+                    hasResultAccess: _addStaffCanResults,
+                    hasAdminAccess: _addStaffCanAdmin,
+                  );
+
+                  await provider.addStaff(newStaff);
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Faculty member "${newStaff.name}" registered successfully!'), backgroundColor: const Color(0xFF059669)),
+                  );
+
+                  // Reset form
+                  _addStaffNameCtrl.clear();
+                  _addStaffPhoneCtrl.clear();
+                  _addStaffEmailCtrl.clear();
+                  _addStaffSamasthaCtrl.clear();
+                  _addStaffUpiAccCtrl.clear();
+                  _addStaffUpiIdCtrl.clear();
+                  _addStaffAssignedClasses.clear();
+
+                  // Switch back to Directory
+                  setState(() {
+                    _currentModuleIndex = 0;
+                    _currentSubIndex = 2;
+                  });
+                },
+                icon: const Icon(Icons.person_add_rounded, size: 16),
+                label: const Text('Register Staff Member'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2563EB),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
   // ========================================================================
-  // 2A. MANAGE STUDENTS
+  // MODULE 2: STUDENT ADMINISTRATION & ENROLLMENT
   // ========================================================================
+
+  // 2A. MANAGE STUDENTS
   Widget _buildManageStudentsTab(InstitutionProvider provider) {
+    final activeYear = provider.setting.activeAcademicYear;
+    final isArchiveView = _filterYear != 'ALL' && _filterYear != activeYear;
+
     final query = _studentSearchCtrl.text.trim().toLowerCase();
     final filtered = provider.students.where((s) {
+      if (_filterYear != 'ALL' && s.academicYear != _filterYear) return false;
       if (_filterClass != 'ALL' && s.studentClass != _filterClass) return false;
       if (_filterGender != 'ALL' && s.gender.toLowerCase() != _filterGender.toLowerCase()) return false;
       if (_filterStatus != 'ALL' && s.status.toLowerCase() != _filterStatus.toLowerCase()) return false;
       if (query.isNotEmpty) {
-        final m = s.name.toLowerCase().contains(query) || s.adm.toLowerCase().contains(query) || s.mobile.contains(query);
+        final m = s.name.toLowerCase().contains(query) ||
+            s.adm.toLowerCase().contains(query) ||
+            s.mobile.contains(query) ||
+            s.father.toLowerCase().contains(query);
         if (!m) return false;
       }
       return true;
     }).toList();
 
+    // Sort order
+    final sortedList = [...filtered];
+    if (_sortMode == 'adm') {
+      sortedList.sort((a, b) {
+        final aNum = int.tryParse(a.adm);
+        final bNum = int.tryParse(b.adm);
+        if (aNum != null && bNum != null) return aNum.compareTo(bNum);
+        return a.adm.compareTo(b.adm);
+      });
+    } else if (_sortMode == 'name') {
+      sortedList.sort((a, b) => a.name.compareTo(b.name));
+    } else if (_sortMode == 'male_first') {
+      sortedList.sort((a, b) {
+        if (a.gender.toLowerCase() != b.gender.toLowerCase()) {
+          return a.gender.toLowerCase() == 'male' ? -1 : 1;
+        }
+        return a.name.compareTo(b.name);
+      });
+    }
+
+    final boysCount = sortedList.where((s) => s.gender.toLowerCase() == 'male').length;
+    final girlsCount = sortedList.where((s) => s.gender.toLowerCase() == 'female').length;
+
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Filter Header Card
+          // Historical Archive Warning Banner
+          if (isArchiveView)
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.history_toggle_off_rounded, color: Color(0xFFD97706), size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'HISTORICAL ARCHIVE SESSION ($_filterYear) — READ ONLY MODE. Modifications are locked to preserve institutional records.',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF92400E)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // Multi-Filter & Search Toolbar Card
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: AppColors.cardShadow,
             ),
-            child: Row(
+            child: Column(
               children: [
-                Expanded(
-                  flex: 2,
-                  child: TextField(
-                    controller: _studentSearchCtrl,
-                    decoration: const InputDecoration(hintText: 'Search Name, Adm #...', prefixIcon: Icon(Icons.search, size: 18), border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
-                    onChanged: (_) => setState(() {}),
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: TextField(
+                        controller: _studentSearchCtrl,
+                        decoration: const InputDecoration(
+                          hintText: 'Search student name, adm #, father, mobile...',
+                          prefixIcon: Icon(Icons.search, size: 18),
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 2,
+                      child: DropdownButtonFormField<String>(
+                        value: _filterYear,
+                        decoration: const InputDecoration(labelText: 'Academic Year', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                        items: ['ALL', ...provider.academicYears.map((y) => y.label)].toSet().map((y) => DropdownMenuItem(value: y, child: Text(y, style: const TextStyle(fontSize: 12)))).toList(),
+                        onChanged: (v) => setState(() => _filterYear = v ?? 'ALL'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 2,
+                      child: DropdownButtonFormField<String>(
+                        value: _filterClass,
+                        decoration: const InputDecoration(labelText: 'Class Cohort', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                        items: ['ALL', ...provider.classes, 'Alumni'].map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12)))).toList(),
+                        onChanged: (v) => setState(() => _filterClass = v ?? 'ALL'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _filterGender,
+                        decoration: const InputDecoration(labelText: 'Gender', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                        items: const [
+                          DropdownMenuItem(value: 'ALL', child: Text('All', style: TextStyle(fontSize: 12))),
+                          DropdownMenuItem(value: 'Male', child: Text('Male', style: TextStyle(fontSize: 12))),
+                          DropdownMenuItem(value: 'Female', child: Text('Female', style: TextStyle(fontSize: 12))),
+                        ],
+                        onChanged: (v) => setState(() => _filterGender = v ?? 'ALL'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _filterStatus,
+                        decoration: const InputDecoration(labelText: 'Status', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                        items: const [
+                          DropdownMenuItem(value: 'ALL', child: Text('All', style: TextStyle(fontSize: 12))),
+                          DropdownMenuItem(value: 'Active', child: Text('Active', style: TextStyle(fontSize: 12))),
+                          DropdownMenuItem(value: 'Alumni', child: Text('Alumni', style: TextStyle(fontSize: 12))),
+                          DropdownMenuItem(value: 'Discontinued', child: Text('Exit', style: TextStyle(fontSize: 12))),
+                        ],
+                        onChanged: (v) => setState(() => _filterStatus = v ?? 'ALL'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 2,
+                      child: DropdownButtonFormField<String>(
+                        value: _sortMode,
+                        decoration: const InputDecoration(labelText: 'Sort By', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                        items: const [
+                          DropdownMenuItem(value: 'adm', child: Text('Adm #', style: TextStyle(fontSize: 12))),
+                          DropdownMenuItem(value: 'name', child: Text('Name (A-Z)', style: TextStyle(fontSize: 12))),
+                          DropdownMenuItem(value: 'male_first', child: Text('Male First', style: TextStyle(fontSize: 12))),
+                        ],
+                        onChanged: (v) => setState(() => _sortMode = v ?? 'adm'),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: _filterClass,
-                    decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
-                    items: ['ALL', ...provider.classes].map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12)))).toList(),
-                    onChanged: (v) => setState(() => _filterClass = v ?? 'ALL'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: _filterStatus,
-                    decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
-                    items: const [
-                      DropdownMenuItem(value: 'ALL', child: Text('All Status', style: TextStyle(fontSize: 12))),
-                      DropdownMenuItem(value: 'Active', child: Text('Active', style: TextStyle(fontSize: 12))),
-                      DropdownMenuItem(value: 'Alumni', child: Text('Alumni', style: TextStyle(fontSize: 12))),
-                      DropdownMenuItem(value: 'Discontinued', child: Text('Exit', style: TextStyle(fontSize: 12))),
-                    ],
-                    onChanged: (v) => setState(() => _filterStatus = v ?? 'ALL'),
-                  ),
+                const SizedBox(height: 10),
+
+                // Quick Action & Export Toolbar
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Text('Showing ${sortedList.length} of ${provider.students.length} students', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(4)),
+                          child: Text('$boysCount Boys', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1D4ED8))),
+                        ),
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(color: const Color(0xFFFDF2F8), borderRadius: BorderRadius.circular(4)),
+                          child: Text('$girlsCount Girls', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFBE185D))),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            final csv = StringBuffer('Sl,AdmNo,Name,Class,Gender,Father,Mobile,Status,AcademicYear\n');
+                            for (int i = 0; i < sortedList.length; i++) {
+                              final s = sortedList[i];
+                              csv.writeln('${i + 1},"${s.adm}","${s.name}","${s.studentClass}","${s.gender}","${s.father}","${s.mobile}","${s.status}","${s.academicYear}"');
+                            }
+                            await Clipboard.setData(ClipboardData(text: csv.toString()));
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Exported ${sortedList.length} students to CSV (Copied to Clipboard)!'), backgroundColor: const Color(0xFF059669)));
+                          },
+                          icon: const Icon(Icons.table_chart_rounded, size: 14),
+                          label: const Text('Export CSV', style: TextStyle(fontSize: 11.5)),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton.icon(
+                          onPressed: () => setState(() {
+                            _currentModuleIndex = 1;
+                            _currentSubIndex = 1;
+                          }),
+                          icon: const Icon(Icons.person_add_rounded, size: 14),
+                          label: const Text('Add Student', style: TextStyle(fontSize: 11.5)),
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
           const SizedBox(height: 14),
 
-          // Students Table / List
+          // Students Roster
           Expanded(
-            child: filtered.isEmpty
-                ? const Center(child: Text('No students matching selected filters.'))
+            child: sortedList.isEmpty
+                ? Container(
+                    padding: const EdgeInsets.all(40),
+                    alignment: Alignment.center,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.groups_outlined, size: 48, color: Color(0xFF94A3B8)),
+                        const SizedBox(height: 12),
+                        const Text('No students matching selected filter criteria.', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                        const SizedBox(height: 4),
+                        const Text('Try clearing your search query or switching the class/status filters.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                      ],
+                    ),
+                  )
                 : ListView.separated(
                     padding: EdgeInsets.zero,
-                    itemCount: filtered.length,
+                    itemCount: sortedList.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (ctx, idx) {
-                      final s = filtered[idx];
+                      final s = sortedList[idx];
+                      final isMale = s.gender.toLowerCase() == 'male';
+                      final avatarColor = isMale ? const Color(0xFF2563EB) : const Color(0xFFBE185D);
+
                       return Container(
                         padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFE2E8F0))),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          boxShadow: AppColors.cardShadow,
+                        ),
                         child: Row(
                           children: [
                             CircleAvatar(
                               radius: 18,
-                              backgroundColor: Colors.blue.shade50,
-                              child: Text(s.name.isNotEmpty ? s.name[0] : 'S', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue.shade800)),
+                              backgroundColor: avatarColor.withOpacity(0.12),
+                              child: Text(
+                                s.name.isNotEmpty ? s.name[0].toUpperCase() : 'S',
+                                style: TextStyle(fontWeight: FontWeight.bold, color: avatarColor, fontSize: 13),
+                              ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
@@ -1264,12 +2257,21 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                                 children: [
                                   Row(
                                     children: [
-                                      Text(s.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                      const SizedBox(width: 6),
+                                      Text(s.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xFF0F172A))),
+                                      const SizedBox(width: 8),
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                         decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(4)),
-                                        child: Text('#${s.adm}', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+                                        child: Text('#${s.adm}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: isMale ? const Color(0xFFEFF6FF) : const Color(0xFFFDF2F8),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(s.gender, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: avatarColor)),
                                       ),
                                       const SizedBox(width: 6),
                                       Container(
@@ -1278,12 +2280,22 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                                           color: s.status == 'Active' ? const Color(0xFFECFDF5) : (s.status == 'Alumni' ? const Color(0xFFFAF5FF) : const Color(0xFFFFF1F2)),
                                           borderRadius: BorderRadius.circular(4),
                                         ),
-                                        child: Text(s.status, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: s.status == 'Active' ? const Color(0xFF065F46) : const Color(0xFF6B21A8))),
+                                        child: Text(
+                                          s.status,
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: s.status == 'Active' ? const Color(0xFF065F46) : (s.status == 'Alumni' ? const Color(0xFF6B21A8) : const Color(0xFF9F1239)),
+                                          ),
+                                        ),
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 2),
-                                  Text('Class: ${s.studentClass} • Father: ${s.father} • Ph: ${s.mobile}', style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    'Class: ${s.studentClass} • Father: ${s.father.isNotEmpty ? s.father : 'N/A'} • Ph: ${s.mobile.isNotEmpty ? s.mobile : 'N/A'} • Year: ${s.academicYear}',
+                                    style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                                  ),
                                 ],
                               ),
                             ),
@@ -1299,7 +2311,7 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                                 final confirmed = await _confirmAction(
                                   context,
                                   title: 'Delete Student Record',
-                                  message: 'Are you sure you want to permanently delete student "${s.name}" (#${s.adm})? All marks, attendance, and registration history will be removed.',
+                                  message: 'Are you sure you want to permanently delete student "${s.name}" (#${s.adm})? All associated marks, fee logs, and registration history will be removed.',
                                   confirmLabel: 'Delete Student',
                                 );
                                 if (confirmed) {
@@ -1323,8 +2335,17 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
     final nameCtrl = TextEditingController(text: s.name);
     final admCtrl = TextEditingController(text: s.adm);
     final fatherCtrl = TextEditingController(text: s.father);
+    final motherCtrl = TextEditingController(text: s.mother);
     final phoneCtrl = TextEditingController(text: s.mobile);
+    final motherPhoneCtrl = TextEditingController(text: s.motherMobile);
+    final dobCtrl = TextEditingController(text: s.dob);
+    final admDateCtrl = TextEditingController(text: s.admissionDate);
+    final aadhaarCtrl = TextEditingController(text: s.adhaar);
+    final uidCtrl = TextEditingController(text: s.uid);
+    final addressCtrl = TextEditingController(text: s.address);
+    final rollCtrl = TextEditingController(text: s.roll.toString());
     String cls = s.studentClass;
+    String gender = s.gender;
     String status = s.status;
 
     showDialog(
@@ -1332,41 +2353,148 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDlg) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('Edit Student: ${s.name}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          title: Row(
+            children: [
+              const Icon(Icons.person_rounded, color: Color(0xFF2563EB), size: 22),
+              const SizedBox(width: 8),
+              Expanded(child: Text('Edit Student: ${s.name} (#${s.adm})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+            ],
+          ),
           content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Name', border: OutlineInputBorder())),
-                const SizedBox(height: 8),
-                TextField(controller: admCtrl, decoration: const InputDecoration(labelText: 'Adm No', border: OutlineInputBorder())),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: cls,
-                  decoration: const InputDecoration(labelText: 'Class', border: OutlineInputBorder()),
-                  items: provider.classes.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                  onChanged: (v) => setDlg(() => cls = v ?? cls),
-                ),
-                const SizedBox(height: 8),
-                TextField(controller: fatherCtrl, decoration: const InputDecoration(labelText: 'Father Name', border: OutlineInputBorder())),
-                const SizedBox(height: 8),
-                TextField(controller: phoneCtrl, decoration: const InputDecoration(labelText: 'Phone', border: OutlineInputBorder())),
-              ],
+            child: SizedBox(
+              width: 550,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('1. Academic & Enrollment Details', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(child: TextField(controller: admCtrl, decoration: const InputDecoration(labelText: 'Adm No *', border: OutlineInputBorder()))),
+                      const SizedBox(width: 8),
+                      Expanded(flex: 2, child: TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Student Full Name *', border: OutlineInputBorder()))),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: cls,
+                          decoration: const InputDecoration(labelText: 'Class *', border: OutlineInputBorder()),
+                          items: provider.classes.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                          onChanged: (v) => setDlg(() => cls = v ?? cls),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: ['Male', 'Female'].contains(gender) ? gender : 'Male',
+                          decoration: const InputDecoration(labelText: 'Gender *', border: OutlineInputBorder()),
+                          items: const [DropdownMenuItem(value: 'Male', child: Text('Male')), DropdownMenuItem(value: 'Female', child: Text('Female'))],
+                          onChanged: (v) => setDlg(() => gender = v ?? 'Male'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(child: TextField(controller: rollCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Roll No', border: OutlineInputBorder()))),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: ['Active', 'Alumni', 'Discontinued'].contains(status) ? status : 'Active',
+                    decoration: const InputDecoration(labelText: 'Enrollment Status *', border: OutlineInputBorder()),
+                    items: const [
+                      DropdownMenuItem(value: 'Active', child: Text('Active Enrollment')),
+                      DropdownMenuItem(value: 'Alumni', child: Text('Graduated Alumni')),
+                      DropdownMenuItem(value: 'Discontinued', child: Text('Discontinued / Exit')),
+                    ],
+                    onChanged: (v) => setDlg(() => status = v ?? 'Active'),
+                  ),
+                  const SizedBox(height: 14),
+
+                  const Text('2. Family & Guardian Contacts', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(child: TextField(controller: fatherCtrl, decoration: const InputDecoration(labelText: "Father's Name *", border: OutlineInputBorder()))),
+                      const SizedBox(width: 8),
+                      Expanded(child: TextField(controller: motherCtrl, decoration: const InputDecoration(labelText: "Mother's Name", border: OutlineInputBorder()))),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(child: TextField(controller: phoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: "Father's Mobile *", border: OutlineInputBorder()))),
+                      const SizedBox(width: 8),
+                      Expanded(child: TextField(controller: motherPhoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: "Mother's Mobile", border: OutlineInputBorder()))),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(controller: addressCtrl, decoration: const InputDecoration(labelText: 'Residential Address', border: OutlineInputBorder())),
+                  const SizedBox(height: 14),
+
+                  const Text('3. Identity & Official Records', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(child: TextField(controller: dobCtrl, decoration: const InputDecoration(labelText: 'Date of Birth (YYYY-MM-DD)', border: OutlineInputBorder()))),
+                      const SizedBox(width: 8),
+                      Expanded(child: TextField(controller: admDateCtrl, decoration: const InputDecoration(labelText: 'Admission Date', border: OutlineInputBorder()))),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(child: TextField(controller: aadhaarCtrl, decoration: const InputDecoration(labelText: 'Aadhaar Number', border: OutlineInputBorder()))),
+                      const SizedBox(width: 8),
+                      Expanded(child: TextField(controller: uidCtrl, decoration: const InputDecoration(labelText: 'Samastha ID / UID', border: OutlineInputBorder()))),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
             ElevatedButton(
-              onPressed: () {
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
+              onPressed: () async {
+                final newAdm = admCtrl.text.trim();
+                final newName = nameCtrl.text.trim();
+                if (newAdm.isEmpty || newName.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Admission number and name cannot be empty!'), backgroundColor: Colors.red));
+                  return;
+                }
+
+                // Check duplicate admission number if changed
+                if (newAdm.toUpperCase() != s.adm.toUpperCase() &&
+                    DuplicateGuard.isAdmissionNoDuplicate(newAdm, provider.students, excludeStudentId: s.id)) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Admission #$newAdm is already in use by another student!'), backgroundColor: Colors.red));
+                  return;
+                }
+
                 final updated = s.copyWith(
-                  name: nameCtrl.text.trim(),
-                  adm: admCtrl.text.trim(),
+                  adm: newAdm,
+                  name: newName,
                   studentClass: cls,
+                  gender: gender,
+                  roll: int.tryParse(rollCtrl.text.trim()) ?? s.roll,
+                  status: status,
                   father: fatherCtrl.text.trim(),
+                  mother: motherCtrl.text.trim(),
                   mobile: phoneCtrl.text.trim(),
+                  motherMobile: motherPhoneCtrl.text.trim(),
+                  address: addressCtrl.text.trim(),
+                  dob: dobCtrl.text.trim(),
+                  admissionDate: admDateCtrl.text.trim(),
+                  adhaar: aadhaarCtrl.text.trim(),
+                  uid: uidCtrl.text.trim(),
                 );
-                provider.updateStudent(updated);
+
+                await provider.updateStudent(updated);
                 Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Student "${updated.name}" updated successfully!'), backgroundColor: const Color(0xFF059669)));
               },
               child: const Text('Save Changes'),
             ),
@@ -1381,41 +2509,103 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+          boxShadow: AppColors.cardShadow,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Add Student (Manual Entry - All 15 Fields)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-            const SizedBox(height: 14),
-
-            if (_admDuplicateWarning != null)
-              Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.red.shade200)),
-                child: Text(_admDuplicateWarning!, style: TextStyle(color: Colors.red.shade800, fontWeight: FontWeight.bold, fontSize: 12)),
-              ),
-
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(child: TextField(controller: _stuAdmCtrl, decoration: const InputDecoration(labelText: 'Admission Number (Adm No) *', border: OutlineInputBorder()))),
-                const SizedBox(width: 10),
-                Expanded(child: TextField(controller: _stuNameCtrl, decoration: const InputDecoration(labelText: 'Full Student Name *', border: OutlineInputBorder()))),
+                Row(
+                  children: const [
+                    Icon(Icons.person_add_rounded, color: Color(0xFF2563EB), size: 22),
+                    SizedBox(width: 8),
+                    Text('Add Student — Manual Form Entry', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                  ],
+                ),
+                TextButton.icon(
+                  onPressed: () => setState(() {
+                    _currentModuleIndex = 1;
+                    _currentSubIndex = 0;
+                  }),
+                  icon: const Icon(Icons.arrow_back_rounded, size: 16),
+                  label: const Text('Back to Manage Students'),
+                ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
+            const Text('Complete 15-field institutional student registration with live duplicate guard and validation.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+            const Divider(height: 24),
+
+            // Duplicate admission warning
+            if (_admDuplicateWarning != null)
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF2F2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFFECDD3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, color: Color(0xFFE11D48), size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(_admDuplicateWarning!, style: const TextStyle(color: Color(0xFF9F1239), fontWeight: FontWeight.bold, fontSize: 12.5)),
+                    ),
+                  ],
+                ),
+              ),
+
+            // Section 1: Academic & Enrollment Information
+            const Text('1. Academic & Enrollment Details', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _stuAdmCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Admission Number (Adm No) *',
+                      hintText: 'e.g. 1045',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: TextField(
+                    controller: _stuNameCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Full Student Name *',
+                      hintText: 'e.g. MOHAMMED RAYAN',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
             Row(
               children: [
                 Expanded(
                   child: DropdownButtonFormField<String>(
                     value: _stuClass ?? (provider.classes.isNotEmpty ? provider.classes.first : null),
-                    decoration: const InputDecoration(labelText: 'Class *', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(labelText: 'Target Class *', border: OutlineInputBorder()),
                     items: provider.classes.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                     onChanged: (v) => setState(() => _stuClass = v),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
                 Expanded(
                   child: DropdownButtonFormField<String>(
                     value: _stuGender,
@@ -1424,87 +2614,238 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                     onChanged: (v) => setState(() => _stuGender = v ?? 'Male'),
                   ),
                 ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _stuRollCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Roll Number', border: OutlineInputBorder()),
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 20),
+
+            // Section 2: Family & Contacts
+            const Text('2. Family & Guardian Contacts', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+            const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: TextField(controller: _stuFatherCtrl, decoration: const InputDecoration(labelText: "Father's Name", border: OutlineInputBorder()))),
-                const SizedBox(width: 10),
-                Expanded(child: TextField(controller: _stuMotherCtrl, decoration: const InputDecoration(labelText: "Mother's Name", border: OutlineInputBorder()))),
+                Expanded(
+                  child: TextField(
+                    controller: _stuFatherCtrl,
+                    decoration: const InputDecoration(labelText: "Father's Full Name *", hintText: 'e.g. ABDULLA', border: OutlineInputBorder()),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _stuMotherCtrl,
+                    decoration: const InputDecoration(labelText: "Mother's Full Name", hintText: 'e.g. FATHIMA', border: OutlineInputBorder()),
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
+
             Row(
               children: [
-                Expanded(child: TextField(controller: _stuFatherMobCtrl, decoration: const InputDecoration(labelText: "Father's Phone Number *", border: OutlineInputBorder()))),
-                const SizedBox(width: 10),
-                Expanded(child: TextField(controller: _stuMotherMobCtrl, decoration: const InputDecoration(labelText: "Mother's Phone Number", border: OutlineInputBorder()))),
+                Expanded(
+                  child: TextField(
+                    controller: _stuFatherMobCtrl,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(labelText: "Father's Phone / WhatsApp *", hintText: 'e.g. 9876543210', border: OutlineInputBorder()),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _stuMotherMobCtrl,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(labelText: "Mother's Phone", hintText: 'e.g. 9876543211', border: OutlineInputBorder()),
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
+
+            TextField(
+              controller: _stuAddressCtrl,
+              decoration: const InputDecoration(labelText: 'Permanent Residential Address *', hintText: 'House Name, Locality, P.O, District', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 20),
+
+            // Section 3: Identity & Records
+            const Text('3. Identity & Official Records', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+            const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: TextField(controller: _stuDobCtrl, decoration: const InputDecoration(labelText: 'Date of Birth (YYYY-MM-DD)', border: OutlineInputBorder()))),
-                const SizedBox(width: 10),
-                Expanded(child: TextField(controller: _stuAdmDateCtrl, decoration: const InputDecoration(labelText: 'Admission Date', border: OutlineInputBorder()))),
+                Expanded(
+                  child: TextField(
+                    controller: _stuDobCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Date of Birth (YYYY-MM-DD)',
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.calendar_today_rounded, size: 18),
+                        onPressed: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: DateTime.tryParse(_stuDobCtrl.text) ?? DateTime(2015, 5, 15),
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime.now(),
+                          );
+                          if (picked != null) {
+                            setState(() => _stuDobCtrl.text = picked.toString().split(' ')[0]);
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _stuAdmDateCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Admission Date (YYYY-MM-DD)',
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.calendar_today_rounded, size: 18),
+                        onPressed: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: DateTime.tryParse(_stuAdmDateCtrl.text) ?? DateTime(2026, 6, 1),
+                            firstDate: DateTime(2015),
+                            lastDate: DateTime(2035),
+                          );
+                          if (picked != null) {
+                            setState(() => _stuAdmDateCtrl.text = picked.toString().split(' ')[0]);
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
+
             Row(
               children: [
-                Expanded(child: TextField(controller: _stuAadhaarCtrl, decoration: const InputDecoration(labelText: 'Aadhaar Number', border: OutlineInputBorder()))),
-                const SizedBox(width: 10),
-                Expanded(child: TextField(controller: _stuUidCtrl, decoration: const InputDecoration(labelText: 'Unique ID / UID', border: OutlineInputBorder()))),
+                Expanded(
+                  child: TextField(
+                    controller: _stuAadhaarCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Aadhaar Number (12 Digits)', border: OutlineInputBorder()),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _stuUidCtrl,
+                    decoration: const InputDecoration(labelText: 'Samastha ID / UID', border: OutlineInputBorder()),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _stuBloodGroupCtrl,
+                    decoration: const InputDecoration(labelText: 'Blood Group', hintText: 'e.g. O+, B+', border: OutlineInputBorder()),
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 10),
-            TextField(controller: _stuAddressCtrl, decoration: const InputDecoration(labelText: 'Permanent Address', border: OutlineInputBorder())),
-            const SizedBox(height: 16),
-            Align(
-              alignment: Alignment.centerRight,
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  if (_stuNameCtrl.text.isEmpty || _stuAdmCtrl.text.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter Student Name and Admission Number!')));
-                    return;
-                  }
-                  final targetCls = _stuClass ?? (provider.classes.isNotEmpty ? provider.classes.first : 'Class 1');
-                  final student = Student(
-                    id: 'stu_${DateTime.now().millisecondsSinceEpoch}',
-                    name: _stuNameCtrl.text.trim(),
-                    adm: _stuAdmCtrl.text.trim(),
-                    studentClass: targetCls,
-                    gender: _stuGender,
-                    father: _stuFatherCtrl.text.trim(),
-                    mother: _stuMotherCtrl.text.trim(),
-                    mobile: _stuFatherMobCtrl.text.trim(),
-                    motherMobile: _stuMotherMobCtrl.text.trim(),
-                    dob: _stuDobCtrl.text.trim(),
-                    admissionDate: _stuAdmDateCtrl.text.trim(),
-                    adhaar: _stuAadhaarCtrl.text.trim(),
-                    uid: _stuUidCtrl.text.trim(),
-                    address: _stuAddressCtrl.text.trim(),
-                    status: _stuStatus,
-                    academicYear: provider.setting.activeAcademicYear,
-                  );
-                  final err = await provider.addStudent(student);
-                  if (err != null) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err), backgroundColor: Colors.red));
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Student ${student.name} saved!')));
-                    _stuNameCtrl.clear();
+            const Divider(height: 30),
+
+            // Submit Row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                OutlinedButton(
+                  onPressed: () {
                     _stuAdmCtrl.clear();
-                    setState(() {
-                      _currentModuleIndex = 1;
-                      _currentSubIndex = 0;
-                    });
-                  }
-                },
-                icon: const Icon(Icons.save, size: 16),
-                label: const Text('Save Student Record'),
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14)),
-              ),
+                    _stuNameCtrl.clear();
+                    _stuFatherCtrl.clear();
+                    _stuMotherCtrl.clear();
+                    _stuFatherMobCtrl.clear();
+                    _stuMotherMobCtrl.clear();
+                    _stuAddressCtrl.clear();
+                    _stuAadhaarCtrl.clear();
+                    _stuUidCtrl.clear();
+                  },
+                  child: const Text('Clear Form'),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    final adm = _stuAdmCtrl.text.trim();
+                    final name = _stuNameCtrl.text.trim();
+                    if (adm.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Admission Number is required!'), backgroundColor: Colors.red));
+                      return;
+                    }
+                    if (name.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Student Name is required!'), backgroundColor: Colors.red));
+                      return;
+                    }
+                    if (DuplicateGuard.isAdmissionNoDuplicate(adm, provider.students)) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Admission #$adm is already in use by another student!'), backgroundColor: Colors.red));
+                      return;
+                    }
+
+                    final targetCls = _stuClass ?? (provider.classes.isNotEmpty ? provider.classes.first : 'Class 1');
+                    final student = Student(
+                      id: 'stu_${DateTime.now().millisecondsSinceEpoch}',
+                      adm: adm,
+                      name: name,
+                      studentClass: targetCls,
+                      gender: _stuGender,
+                      roll: int.tryParse(_stuRollCtrl.text.trim()) ?? 1,
+                      father: _stuFatherCtrl.text.trim(),
+                      mother: _stuMotherCtrl.text.trim(),
+                      mobile: _stuFatherMobCtrl.text.trim(),
+                      motherMobile: _stuMotherMobCtrl.text.trim(),
+                      dob: _stuDobCtrl.text.trim(),
+                      admissionDate: _stuAdmDateCtrl.text.trim(),
+                      adhaar: _stuAadhaarCtrl.text.trim(),
+                      uid: _stuUidCtrl.text.trim(),
+                      address: _stuAddressCtrl.text.trim(),
+                      status: _stuStatus,
+                      academicYear: provider.setting.activeAcademicYear,
+                    );
+
+                    final err = await provider.addStudent(student);
+                    if (err != null) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err), backgroundColor: Colors.red));
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Student "${student.name}" (#${student.adm}) enrolled successfully!'), backgroundColor: const Color(0xFF059669)),
+                      );
+                      _stuAdmCtrl.clear();
+                      _stuNameCtrl.clear();
+                      _stuFatherCtrl.clear();
+                      _stuMotherCtrl.clear();
+                      _stuFatherMobCtrl.clear();
+                      _stuMotherMobCtrl.clear();
+                      _stuAddressCtrl.clear();
+
+                      setState(() {
+                        _currentModuleIndex = 1;
+                        _currentSubIndex = 0;
+                      });
+                    }
+                  },
+                  icon: const Icon(Icons.save_rounded, size: 16),
+                  label: const Text('Save & Enroll Student'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -1514,99 +2855,442 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
 
   // 2C. BULK EXCEL UPLOAD
   Widget _buildBulkExcelTab(InstitutionProvider provider) {
-    String? targetClass = provider.classes.isNotEmpty ? provider.classes.first : null;
+    _bulkTargetClass ??= (provider.classes.isNotEmpty ? provider.classes.first : 'Class 1');
+    final validRowsCount = _parsedBulkStudents.where((r) => r['isValid'] == true).length;
+    final errorRowsCount = _parsedBulkStudents.where((r) => r['isValid'] != true).length;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+          boxShadow: AppColors.cardShadow,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Bulk Student Upload (CSV / Excel)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: const [
+                    Icon(Icons.file_upload_rounded, color: Color(0xFF2563EB), size: 22),
+                    SizedBox(width: 8),
+                    Text('Bulk Student Spreadsheet Import (CSV / TSV)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                  ],
+                ),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    const sample = 'AdmNo,Name,Gender,Father,Mobile,DOB,Address\n'
+                        '1001,MOHAMMED RAYAN,Male,ABDULLA,9876543210,2015-05-15,Kozhikode\n'
+                        '1002,AYISHA NASRIN,Female,USMAN,9876543211,2015-08-20,Malappuram\n'
+                        '1003,ZAYAN AHMAD,Male,MUSTHAFA,9876543212,2015-11-10,Kannur';
+                    await Clipboard.setData(const ClipboardData(text: sample));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('CSV Template copied to clipboard! You can paste it into Excel or below.'), backgroundColor: Color(0xFF059669)),
+                    );
+                  },
+                  icon: const Icon(Icons.download_rounded, size: 14),
+                  label: const Text('Download CSV Template'),
+                ),
+              ],
+            ),
             const SizedBox(height: 6),
-            const Text('Upload spreadsheet with headers like Name, AdmNo, Class, Gender, Father, Phone, Address.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              value: targetClass,
-              decoration: const InputDecoration(labelText: 'Target Class for Batch *', border: OutlineInputBorder()),
-              items: provider.classes.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-              onChanged: (v) => targetClass = v,
+            const Text('Upload batches of students in bulk. Paste spreadsheet rows directly or load sample data to test client validation.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+            const Divider(height: 24),
+
+            // Step 1: Destination Class
+            Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: DropdownButtonFormField<String>(
+                    value: _bulkTargetClass,
+                    decoration: const InputDecoration(labelText: 'Target Class for Batch Enrollment *', border: OutlineInputBorder()),
+                    items: provider.classes.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                    onChanged: (v) => setState(() => _bulkTargetClass = v),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    _bulkCsvTextCtrl.text = '1001,MOHAMMED RAYAN,Male,ABDULLA,9876543210,2015-05-15,Kozhikode\n'
+                        '1002,AYISHA NASRIN,Female,USMAN,9876543211,2015-08-20,Malappuram\n'
+                        '1003,ZAYAN AHMAD,Male,MUSTHAFA,9876543212,2015-11-10,Kannur';
+                    _parseBulkCsvData(provider.students, _bulkTargetClass!);
+                  },
+                  icon: const Icon(Icons.auto_awesome, size: 14),
+                  label: const Text('Load 3 Sample Rows'),
+                  style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18)),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFCBD5E1), style: BorderStyle.solid)),
-              child: Center(
-                child: Column(
+
+            // Step 2: Spreadsheet Data Input Area
+            const Text('Paste Spreadsheet Data (Columns: AdmNo, Name, Gender, Father, Mobile, DOB, Address)', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _bulkCsvTextCtrl,
+              maxLines: 6,
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+              decoration: const InputDecoration(
+                hintText: '1001,MOHAMMED RAYAN,Male,ABDULLA,9876543210,2015-05-15,Kozhikode\n1002,AYISHA NASRIN,Female,USMAN,9876543211,2015-08-20,Malappuram...',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (_) {
+                if (_parsedBulkStudents.isNotEmpty) {
+                  _parseBulkCsvData(provider.students, _bulkTargetClass!);
+                }
+              },
+            ),
+            const SizedBox(height: 12),
+
+            Row(
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () => _parseBulkCsvData(provider.students, _bulkTargetClass!),
+                  icon: const Icon(Icons.rule_rounded, size: 16),
+                  label: const Text('Parse & Validate Spreadsheet Data'),
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
+                ),
+                const SizedBox(width: 10),
+                if (_parsedBulkStudents.isNotEmpty)
+                  TextButton(
+                    onPressed: () => setState(() {
+                      _parsedBulkStudents.clear();
+                      _bulkCsvTextCtrl.clear();
+                    }),
+                    child: const Text('Clear Table'),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Step 3: Visual Data Preview Table
+            if (_parsedBulkStudents.isNotEmpty) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Icon(Icons.cloud_upload_outlined, size: 36, color: Color(0xFF2563EB)),
-                    const SizedBox(height: 8),
-                    const Text('Select CSV or Excel Spreadsheet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                    const SizedBox(height: 4),
-                    const Text('Supports .csv, .xlsx column auto-mapping', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Text('Batch Validation Preview: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(6)),
+                          child: Text('$validRowsCount Valid', style: const TextStyle(color: Color(0xFF065F46), fontWeight: FontWeight.bold, fontSize: 11.5)),
+                        ),
+                        const SizedBox(width: 6),
+                        if (errorRowsCount > 0)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(color: const Color(0xFFFFF1F2), borderRadius: BorderRadius.circular(6)),
+                            child: Text('$errorRowsCount Errors', style: const TextStyle(color: Color(0xFF9F1239), fontWeight: FontWeight.bold, fontSize: 11.5)),
+                          ),
+                      ],
+                    ),
                     ElevatedButton.icon(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('File picker ready for CSV/Excel batch upload.')));
-                      },
-                      icon: const Icon(Icons.file_open, size: 16),
-                      label: const Text('Browse Files'),
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
+                      onPressed: _isUploadingBulk || validRowsCount == 0
+                          ? null
+                          : () => _uploadBulkStudents(provider, true),
+                      icon: _isUploadingBulk
+                          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Icon(Icons.cloud_upload_rounded, size: 16),
+                      label: Text(_isUploadingBulk ? 'Uploading... (${(_bulkUploadProgress * 100).toInt()}%)' : 'Enroll $validRowsCount Valid Students'),
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF059669), foregroundColor: Colors.white),
                     ),
                   ],
                 ),
               ),
-            ),
+              const SizedBox(height: 10),
+
+              // Table
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: DataTable(
+                    headingRowColor: WidgetStateProperty.all(const Color(0xFFF1F5F9)),
+                    columns: const [
+                      DataColumn(label: Text('#', style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataColumn(label: Text('Adm No', style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataColumn(label: Text('Student Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataColumn(label: Text('Gender', style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataColumn(label: Text('Father', style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataColumn(label: Text('Mobile', style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataColumn(label: Text('Validation Status', style: TextStyle(fontWeight: FontWeight.bold))),
+                    ],
+                    rows: _parsedBulkStudents.asMap().entries.map((entry) {
+                      final idx = entry.key;
+                      final row = entry.value;
+                      final isValid = row['isValid'] == true;
+                      return DataRow(
+                        color: WidgetStateProperty.all(isValid ? Colors.white : const Color(0xFFFFF1F2)),
+                        cells: [
+                          DataCell(Text('${idx + 1}')),
+                          DataCell(Text(row['adm'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold))),
+                          DataCell(Text(row['name'] ?? '')),
+                          DataCell(Text(row['gender'] ?? '')),
+                          DataCell(Text(row['father'] ?? '')),
+                          DataCell(Text(row['mobile'] ?? '')),
+                          DataCell(
+                            isValid
+                                ? Row(
+                                    children: const [
+                                      Icon(Icons.check_circle_rounded, color: Color(0xFF059669), size: 16),
+                                      SizedBox(width: 4),
+                                      Text('Ready', style: TextStyle(color: Color(0xFF065F46), fontWeight: FontWeight.bold, fontSize: 11.5)),
+                                    ],
+                                  )
+                                : Row(
+                                    children: [
+                                      const Icon(Icons.error_outline_rounded, color: Color(0xFFE11D48), size: 16),
+                                      const SizedBox(width: 4),
+                                      Text(row['errorReason'] ?? 'Invalid', style: const TextStyle(color: Color(0xFF9F1239), fontWeight: FontWeight.bold, fontSize: 11.5)),
+                                    ],
+                                  ),
+                          ),
+                        ],
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 
+  void _parseBulkCsvData(List<Student> existingStudents, String targetClass) {
+    final text = _bulkCsvTextCtrl.text.trim();
+    if (text.isEmpty) {
+      setState(() => _parsedBulkStudents = []);
+      return;
+    }
+
+    final lines = text.split(RegExp(r'\r?\n')).map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+    if (lines.isEmpty) return;
+
+    final List<Map<String, dynamic>> results = [];
+    final Set<String> seenBatchAdmNos = {};
+
+    int startIdx = 0;
+    final firstLower = lines[0].toLowerCase();
+    if (firstLower.contains('adm') || firstLower.contains('name') || firstLower.contains('admission')) {
+      startIdx = 1;
+    }
+
+    for (int i = startIdx; i < lines.length; i++) {
+      final line = lines[i];
+      final parts = line.contains('\t') ? line.split('\t') : line.split(',');
+      final clean = parts.map((p) => p.trim().replaceAll(RegExp(r'^["\x27]|["\x27]$'), '')).toList();
+
+      final adm = clean.isNotEmpty ? clean[0].trim() : '';
+      final name = clean.length > 1 ? clean[1].trim() : '';
+      final rawGender = clean.length > 2 ? clean[2].trim() : 'Male';
+      final father = clean.length > 3 ? clean[3].trim() : '';
+      final mobile = clean.length > 4 ? clean[4].trim() : '';
+      final dob = clean.length > 5 ? clean[5].trim() : '2015-05-15';
+      final address = clean.length > 6 ? clean[6].trim() : '';
+
+      String gender = 'Male';
+      if (rawGender.toLowerCase().startsWith('f')) gender = 'Female';
+
+      String? errorReason;
+      if (adm.isEmpty) {
+        errorReason = 'Missing Adm #';
+      } else if (name.isEmpty) {
+        errorReason = 'Missing Name';
+      } else if (seenBatchAdmNos.contains(adm.toUpperCase())) {
+        errorReason = 'Duplicate in batch';
+      } else if (DuplicateGuard.isAdmissionNoDuplicate(adm, existingStudents)) {
+        errorReason = 'Adm # exists in database';
+      }
+
+      if (errorReason == null) {
+        seenBatchAdmNos.add(adm.toUpperCase());
+      }
+
+      results.add({
+        'adm': adm,
+        'name': name,
+        'gender': gender,
+        'father': father,
+        'mobile': mobile,
+        'dob': dob,
+        'address': address,
+        'isValid': errorReason == null,
+        'errorReason': errorReason,
+        'targetClass': targetClass,
+      });
+    }
+
+    setState(() => _parsedBulkStudents = results);
+  }
+
+  Future<void> _uploadBulkStudents(InstitutionProvider provider, bool validOnly) async {
+    final toUpload = _parsedBulkStudents.where((r) => validOnly ? r['isValid'] == true : true).toList();
+    if (toUpload.isEmpty) return;
+
+    setState(() {
+      _isUploadingBulk = true;
+      _bulkUploadProgress = 0.0;
+    });
+
+    int successCount = 0;
+    final targetCls = _bulkTargetClass ?? (provider.classes.isNotEmpty ? provider.classes.first : 'Class 1');
+
+    for (int i = 0; i < toUpload.length; i++) {
+      final row = toUpload[i];
+      final stu = Student(
+        id: 'stu_${DateTime.now().millisecondsSinceEpoch}_$i',
+        adm: row['adm'],
+        name: row['name'],
+        studentClass: targetCls,
+        gender: row['gender'],
+        father: row['father'],
+        mobile: row['mobile'],
+        dob: row['dob'],
+        address: row['address'],
+        status: 'Active',
+        academicYear: provider.setting.activeAcademicYear,
+      );
+      final err = await provider.addStudent(stu);
+      if (err == null) successCount++;
+
+      setState(() => _bulkUploadProgress = (i + 1) / toUpload.length);
+    }
+
+    setState(() {
+      _isUploadingBulk = false;
+      _parsedBulkStudents = [];
+      _bulkCsvTextCtrl.clear();
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Successfully enrolled $successCount students into $targetCls!'),
+        backgroundColor: const Color(0xFF059669),
+      ),
+    );
+
+    setState(() {
+      _currentModuleIndex = 1;
+      _currentSubIndex = 0;
+    });
+  }
+
   // 2D. CLASSES & DIVISIONS
   Widget _buildClassesDivisionsTab(InstitutionProvider provider) {
+    final sourceStudents = _moveSourceClass != null
+        ? provider.students.where((s) => s.studentClass == _moveSourceClass && s.status == 'Active').toList()
+        : <Student>[];
+    final boys = sourceStudents.where((s) => s.gender.toLowerCase() == 'male').toList();
+    final girls = sourceStudents.where((s) => s.gender.toLowerCase() == 'female').toList();
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Add & Generator Tools
+          // Add & Generator Tools Card
           Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: AppColors.cardShadow,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Create Classes & Divisions', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                const SizedBox(height: 12),
+                const Text('Create Classes & Divisions', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                const SizedBox(height: 4),
+                const Text('Create individual classes or automatically generate standard 1 to 12 ladders and lettered divisions.', style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
+                const SizedBox(height: 14),
+
                 Row(
                   children: [
-                    Expanded(child: TextField(controller: _newClassCtrl, decoration: const InputDecoration(labelText: 'New Class Name (e.g. 10 A)', border: OutlineInputBorder()))),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
+                    Expanded(
+                      flex: 3,
+                      child: TextField(
+                        controller: _newClassCtrl,
+                        decoration: const InputDecoration(labelText: 'New Class / Division Name', hintText: 'e.g. 10 A, Commerce', border: OutlineInputBorder()),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    ElevatedButton.icon(
                       onPressed: () {
-                        provider.addClass(_newClassCtrl.text);
-                        _newClassCtrl.clear();
+                        final val = _newClassCtrl.text.trim();
+                        if (val.isNotEmpty) {
+                          provider.addClass(val);
+                          _newClassCtrl.clear();
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Class "$val" created!'), backgroundColor: const Color(0xFF059669)));
+                        }
                       },
-                      child: const Text('Save Class'),
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('Save Class'),
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16)),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
+
+                // Generator tools
                 Wrap(
-                  spacing: 10,
+                  spacing: 12,
                   runSpacing: 10,
                   children: [
                     OutlinedButton.icon(
-                      onPressed: () => provider.generateDefaultClasses(),
+                      onPressed: () async {
+                        await provider.generateDefaultClasses();
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Generated standard Classes 1 through 12!'), backgroundColor: Color(0xFF059669)));
+                      },
                       icon: const Icon(Icons.auto_awesome, size: 16),
-                      label: const Text('Generate Default 1 to 12'),
+                      label: const Text('Generate Default 1 to 12 Ladder'),
                     ),
-                    OutlinedButton.icon(
-                      onPressed: () => provider.generateDivisions(_divisionBaseCtrl.text, int.tryParse(_divisionCountCtrl.text) ?? 3),
-                      icon: const Icon(Icons.grid_view_rounded, size: 16),
-                      label: const Text('Generate Divisions (A/B/C)'),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 80,
+                          child: TextField(controller: _divisionBaseCtrl, decoration: const InputDecoration(labelText: 'Base Class', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 10))),
+                        ),
+                        const SizedBox(width: 6),
+                        SizedBox(
+                          width: 80,
+                          child: TextField(controller: _divisionCountCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Divisions', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 10))),
+                        ),
+                        const SizedBox(width: 8),
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            final base = _divisionBaseCtrl.text.trim();
+                            final count = int.tryParse(_divisionCountCtrl.text.trim()) ?? 3;
+                            if (base.isNotEmpty && count > 0) {
+                              await provider.generateDivisions(base, count);
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Generated $count divisions for Class "$base"!'), backgroundColor: const Color(0xFF059669)));
+                            }
+                          },
+                          icon: const Icon(Icons.grid_view_rounded, size: 16),
+                          label: const Text('Create Divisions (A/B/C)'),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -1615,40 +3299,294 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
           ),
           const SizedBox(height: 20),
 
-          // Active Classes Grid
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Active Classes (${provider.classes.length})', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-              const Text('Tap class chip to Rename', style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontStyle: FontStyle.italic)),
-            ],
+          // Active Classes Grid Card
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: AppColors.cardShadow,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Active Classes & Enrollment (${provider.classes.length})', style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                    const Text('Tap any chip to rename class', style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B), fontStyle: FontStyle.italic)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (provider.classes.isEmpty)
+                  const Padding(padding: EdgeInsets.all(20), child: Center(child: Text('No classes added yet.')))
+                else
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: provider.classes.map((c) {
+                      final count = provider.students.where((s) => s.studentClass == c && s.status == 'Active').length;
+                      return InputChip(
+                        avatar: CircleAvatar(
+                          backgroundColor: const Color(0xFFDBEAFE),
+                          child: Text('$count', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF1D4ED8))),
+                        ),
+                        label: Text(c, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        onPressed: () => _showRenameClassModal(c, provider),
+                        deleteIcon: const Icon(Icons.close, size: 15),
+                        deleteButtonTooltipMessage: 'Delete Class',
+                        onDeleted: () async {
+                          final confirmed = await _confirmAction(
+                            context,
+                            title: 'Delete Class "$c"',
+                            message: 'Are you sure you want to permanently delete class "$c"? $count enrolled student(s) currently belong to this class.',
+                            confirmLabel: 'Delete Class',
+                          );
+                          if (confirmed) {
+                            await provider.removeClass(c);
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Class "$c" deleted.')));
+                          }
+                        },
+                      );
+                    }).toList(),
+                  ),
+              ],
+            ),
           ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: provider.classes.map((c) {
-              final count = provider.students.where((s) => s.studentClass == c && s.status == 'Active').length;
-              return InputChip(
-                avatar: CircleAvatar(backgroundColor: Colors.blue.shade100, child: Text('$count', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blue.shade900))),
-                label: Text(c, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                onPressed: () => _showRenameClassModal(c, provider),
-                deleteIcon: const Icon(Icons.close, size: 16),
-                deleteButtonTooltipMessage: 'Delete Class',
-                onDeleted: () async {
-                  final confirmed = await _confirmAction(
-                    context,
-                    title: 'Delete Class "$c"',
-                    message: 'Are you sure you want to permanently delete class "$c"? $count enrolled student(s) currently belong to this class.',
-                    confirmLabel: 'Delete Class',
-                  );
-                  if (confirmed) {
-                    await provider.removeClass(c);
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Class "$c" deleted.')));
-                  }
-                },
-              );
-            }).toList(),
+          const SizedBox(height: 20),
+
+          // 3. Divide / Merge / Move Students Workstation
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: AppColors.cardShadow,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: const [
+                        Icon(Icons.swap_horiz_rounded, color: Color(0xFF2563EB), size: 22),
+                        SizedBox(width: 8),
+                        Text('Divide / Merge & Move Students Workstation', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                      ],
+                    ),
+                    if (_selectedMoveStudentIds.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(8)),
+                        child: Text('${_selectedMoveStudentIds.length} Selected to Move', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1D4ED8))),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                const Text('Split classes into divisions, reassign boys/girls, or bulk move cohorts to another standard.', style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
+                const SizedBox(height: 14),
+
+                // Select Source & Target Classes
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _moveSourceClass,
+                        decoration: const InputDecoration(labelText: '1. Select Source Class *', border: OutlineInputBorder()),
+                        items: provider.classes.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                        onChanged: (val) {
+                          setState(() {
+                            _moveSourceClass = val;
+                            _selectedMoveStudentIds.clear();
+                          });
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _moveTargetClass,
+                        decoration: const InputDecoration(labelText: '2. Select Destination Class *', border: OutlineInputBorder()),
+                        items: provider.classes.where((c) => c != _moveSourceClass).map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                        onChanged: (val) => setState(() => _moveTargetClass = val),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                if (_moveSourceClass != null) ...[
+                  // Demographic split header
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(8)),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Source Cohort: $_moveSourceClass (${sourceStudents.length} Students Total)', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A))),
+                        Row(
+                          children: [
+                            TextButton.icon(
+                              onPressed: () {
+                                setState(() {
+                                  final allBoysSelected = boys.every((b) => _selectedMoveStudentIds.contains(b.id));
+                                  if (allBoysSelected) {
+                                    for (final b in boys) _selectedMoveStudentIds.remove(b.id);
+                                  } else {
+                                    for (final b in boys) _selectedMoveStudentIds.add(b.id);
+                                  }
+                                });
+                              },
+                              icon: const Icon(Icons.select_all_rounded, size: 14),
+                              label: Text(boys.every((b) => _selectedMoveStudentIds.contains(b.id)) ? 'Deselect All Boys' : 'Select All Boys (${boys.length})', style: const TextStyle(fontSize: 11.5)),
+                            ),
+                            const SizedBox(width: 8),
+                            TextButton.icon(
+                              onPressed: () {
+                                setState(() {
+                                  final allGirlsSelected = girls.every((g) => _selectedMoveStudentIds.contains(g.id));
+                                  if (allGirlsSelected) {
+                                    for (final g in girls) _selectedMoveStudentIds.remove(g.id);
+                                  } else {
+                                    for (final g in girls) _selectedMoveStudentIds.add(g.id);
+                                  }
+                                });
+                              },
+                              icon: const Icon(Icons.select_all_rounded, size: 14),
+                              label: Text(girls.every((g) => _selectedMoveStudentIds.contains(g.id)) ? 'Deselect All Girls' : 'Select All Girls (${girls.length})', style: const TextStyle(fontSize: 11.5)),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Split Columns for Boys & Girls
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Boys Column
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF0F9FF),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFBAE6FD)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.man_rounded, color: Color(0xFF0284C7), size: 18),
+                                  const SizedBox(width: 6),
+                                  Text('Boys (${boys.length})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0369A1))),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              if (boys.isEmpty)
+                                const Padding(padding: EdgeInsets.all(16), child: Center(child: Text('No boys in this class', style: TextStyle(fontSize: 12, color: Color(0xFF64748B)))))
+                              else
+                                ...boys.map((b) {
+                                  final isSel = _selectedMoveStudentIds.contains(b.id);
+                                  return CheckboxListTile(
+                                    dense: true,
+                                    value: isSel,
+                                    title: Text(b.name, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                                    subtitle: Text('Adm #${b.adm}', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                                    onChanged: (val) {
+                                      setState(() {
+                                        if (val == true) _selectedMoveStudentIds.add(b.id); else _selectedMoveStudentIds.remove(b.id);
+                                      });
+                                    },
+                                  );
+                                }),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+
+                      // Girls Column
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFDF2F8),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFFBCFE8)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.woman_rounded, color: Color(0xFFBE185D), size: 18),
+                                  const SizedBox(width: 6),
+                                  Text('Girls (${girls.length})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF9D174D))),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              if (girls.isEmpty)
+                                const Padding(padding: EdgeInsets.all(16), child: Center(child: Text('No girls in this class', style: TextStyle(fontSize: 12, color: Color(0xFF64748B)))))
+                              else
+                                ...girls.map((g) {
+                                  final isSel = _selectedMoveStudentIds.contains(g.id);
+                                  return CheckboxListTile(
+                                    dense: true,
+                                    value: isSel,
+                                    title: Text(g.name, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                                    subtitle: Text('Adm #${g.adm}', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                                    onChanged: (val) {
+                                      setState(() {
+                                        if (val == true) _selectedMoveStudentIds.add(g.id); else _selectedMoveStudentIds.remove(g.id);
+                                      });
+                                    },
+                                  );
+                                }),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Execute Move Button
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: ElevatedButton.icon(
+                      onPressed: (_selectedMoveStudentIds.isEmpty || _moveTargetClass == null)
+                          ? null
+                          : () async {
+                              final count = _selectedMoveStudentIds.length;
+                              await provider.moveStudentsToClass(_selectedMoveStudentIds.toList(), _moveTargetClass!);
+                              setState(() {
+                                _selectedMoveStudentIds.clear();
+                              });
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Successfully moved $count students to "$_moveTargetClass"!'), backgroundColor: const Color(0xFF059669)),
+                              );
+                            },
+                      icon: const Icon(Icons.transfer_within_a_station_rounded, size: 16),
+                      label: Text('Move ${_selectedMoveStudentIds.length} Selected Students to ${_moveTargetClass ?? "Destination"}'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2563EB),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ],
       ),
@@ -1684,7 +3622,7 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
               if (newName.isNotEmpty && newName != oldName) {
                 await provider.renameClass(oldName, newName);
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Class renamed to "$newName" successfully!')));
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Class renamed to "$newName" successfully!'), backgroundColor: const Color(0xFF059669)));
               }
             },
             child: const Text('Save & Update Students'),
