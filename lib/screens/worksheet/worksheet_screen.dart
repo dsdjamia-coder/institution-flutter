@@ -61,7 +61,12 @@ class _WorksheetScreenState extends State<WorksheetScreen> {
           id: 'summary',
           label: 'Class Summary',
           icon: Icons.bar_chart_rounded,
-          body:
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Active Class Summary
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
