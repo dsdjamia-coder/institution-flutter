@@ -23,6 +23,21 @@ class OfficialHubScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 1,
+        leading: Padding(
+          padding: const EdgeInsets.all(9.0),
+          child: Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: const Color(0xFFCBD5E1)),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Image.asset(
+              'assets/icon.png',
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const Icon(Icons.school, size: 20, color: Color(0xFF2563EB)),
+            ),
+          ),
+        ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

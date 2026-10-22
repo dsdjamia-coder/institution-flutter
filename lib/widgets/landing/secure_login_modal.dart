@@ -180,19 +180,27 @@ class _SecureLoginModalState extends State<SecureLoginModal> {
                 ),
               ),
 
-              // Blue Lock Badge at Top Center
+              // Application Icon Badge at Top Center
               Container(
-                width: 52,
-                height: 52,
+                width: 56,
+                height: 56,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: const Color(0xFFDBEAFE)),
+                  boxShadow: [
+                    BoxShadow(color: const Color(0xFF2563EB).withOpacity(0.12), blurRadius: 10, offset: const Offset(0, 4)),
+                  ],
                 ),
-                child: Icon(
-                  _isStudentMode ? Icons.school_rounded : Icons.admin_panel_settings_rounded,
-                  color: const Color(0xFF2563EB),
-                  size: 28,
+                clipBehavior: Clip.antiAlias,
+                child: Image.asset(
+                  'assets/icon.png',
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Icon(
+                    _isStudentMode ? Icons.school_rounded : Icons.admin_panel_settings_rounded,
+                    color: const Color(0xFF2563EB),
+                    size: 28,
+                  ),
                 ),
               ),
               const SizedBox(height: 14),

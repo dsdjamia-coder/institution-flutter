@@ -2587,6 +2587,66 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
           children: [
             const Text('Website & Public Profile Settings', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
             const SizedBox(height: 14),
+
+            // Visual Branding Preview Card (Application Icon & Institution Logo)
+            Container(
+              padding: const EdgeInsets.all(14),
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Row(
+                children: [
+                  // App Icon Preview
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Image.asset('assets/icon.png', fit: BoxFit.cover),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Application Icon (App Logo)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                        Text('APK Launcher, Web Favicon & Device Icon', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  // Institution Logo Preview
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Image.asset('assets/images/logo.png', fit: BoxFit.cover),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Institution Logo', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                        Text('Default School Logo for Receipts & ID Cards', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
             Row(
               children: [
                 Expanded(child: TextField(controller: _webAppNameCtrl, decoration: const InputDecoration(labelText: 'App Name', border: OutlineInputBorder()))),

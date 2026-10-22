@@ -1,11 +1,11 @@
 {
-    "name": "sanjid_app",
-    "short_name": "sanjid_app",
+    "name": "Institution Management System",
+    "short_name": "Institution App",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#2563EB",
+    "theme_color": "#2563EB",
+    "description": "Universal Cross-Platform Institution Management System.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

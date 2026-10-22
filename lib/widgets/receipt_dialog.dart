@@ -49,6 +49,21 @@ class ReceiptDialog extends StatelessWidget {
               ),
               child: Column(
                 children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    margin: const EdgeInsets.only(bottom: 8),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Image.asset(
+                      'assets/images/logo.png',
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Icon(Icons.school, size: 24, color: Color(0xFF2563EB)),
+                    ),
+                  ),
                   Text(
                     setting.institutionName.toUpperCase(),
                     style: const TextStyle(

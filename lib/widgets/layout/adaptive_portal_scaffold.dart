@@ -254,7 +254,7 @@ class _AdaptivePortalScaffoldState extends State<AdaptivePortalScaffold> {
                     mainAxisAlignment: _isSidebarExpanded ? MainAxisAlignment.spaceBetween : MainAxisAlignment.center,
                     children: [
                       if (_isSidebarExpanded) ...[
-                        // Logo at left corner
+                        // Application Logo at left corner
                         Container(
                           width: 36,
                           height: 36,
@@ -265,7 +265,7 @@ class _AdaptivePortalScaffoldState extends State<AdaptivePortalScaffold> {
                           ),
                           clipBehavior: Clip.antiAlias,
                           child: Image.asset(
-                            'assets/images/logo.png',
+                            'assets/icon.png',
                             fit: BoxFit.cover,
                             errorBuilder: (_, __, ___) => const Icon(Icons.school, size: 20, color: Color(0xFF2563EB)),
                           ),
@@ -310,24 +310,22 @@ class _AdaptivePortalScaffoldState extends State<AdaptivePortalScaffold> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (!_isSidebarExpanded) ...[
-                          Container(
-                            width: 32,
-                            height: 32,
-                            margin: const EdgeInsets.only(right: 10),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: const Color(0xFFCBD5E1)),
-                              color: Colors.white,
-                            ),
-                            clipBehavior: Clip.antiAlias,
-                            child: Image.asset(
-                              'assets/images/logo.png',
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Icon(Icons.school, size: 18, color: Color(0xFF2563EB)),
-                            ),
+                        Container(
+                          width: 32,
+                          height: 32,
+                          margin: const EdgeInsets.only(right: 10),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: const Color(0xFFCBD5E1)),
+                            color: Colors.white,
                           ),
-                        ],
+                          clipBehavior: Clip.antiAlias,
+                          child: Image.asset(
+                            'assets/images/logo.png',
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Icon(Icons.school, size: 18, color: Color(0xFF2563EB)),
+                          ),
+                        ),
                         Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.center,
@@ -801,6 +799,21 @@ class _AdaptivePortalScaffoldState extends State<AdaptivePortalScaffold> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
+        leading: Padding(
+          padding: const EdgeInsets.all(9.0),
+          child: Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: const Color(0xFFCBD5E1)),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Image.asset(
+              'assets/icon.png',
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const Icon(Icons.school, size: 20, color: Color(0xFF2563EB)),
+            ),
+          ),
+        ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
