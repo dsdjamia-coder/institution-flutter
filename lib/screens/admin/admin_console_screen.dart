@@ -140,10 +140,20 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
   String? _selectedDiscStudentId;
   final _discSearchCtrl = TextEditingController();
   final _discDateCtrl = TextEditingController();
-  final _discReasonCtrl = TextEditingController();
+  final _discReasonCtrl = TextEditingController(text: 'Transfer / TC');
   bool _discCollectDuesNow = false;
   final _discReceiptNoCtrl = TextEditingController();
+  final _discCollectAmountCtrl = TextEditingController(text: '0');
+  String _discPaymentMode = 'CASH';
   final _discNotesCtrl = TextEditingController();
+
+  // Departed Directory Filter
+  final _departedSearchCtrl = TextEditingController();
+  String? _departedClassFilter;
+
+  // Continuity Timeline Selection
+  String? _timelineSelectedStudentId;
+  final _timelineSearchCtrl = TextEditingController();
 
   // Audit Logs Filter
   String _auditCategoryFilter = 'all';
@@ -281,7 +291,10 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
     _discDateCtrl.dispose();
     _discReasonCtrl.dispose();
     _discReceiptNoCtrl.dispose();
+    _discCollectAmountCtrl.dispose();
     _discNotesCtrl.dispose();
+    _departedSearchCtrl.dispose();
+    _timelineSearchCtrl.dispose();
     _auditSearchCtrl.dispose();
     _currentPasswordCtrl.dispose();
     _newEmailCtrl.dispose();
@@ -3633,6 +3646,55 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
   }
 
   // ========================================================================
+  // MODULE 3: CONTINUITY, DEPARTURES & RE-ADMISSION ENGINE
+  // ========================================================================
+
+  String _calculateGapDuration(String exitDateStr) {
+    if (exitDateStr.isEmpty) return 'Gap unknown';
+    try {
+      final exitDate = DateTime.tryParse(exitDateStr);
+      if (exitDate == null) return 'Departed';
+      final now = DateTime.now();
+      if (now.isBefore(exitDate)) return 'Departed today';
+
+      int years = now.year - exitDate.year;
+      int months = now.month - exitDate.month;
+      int days = now.day - exitDate.day;
+
+      if (days < 0) {
+        months -= 1;
+      }
+      if (months < 0) {
+        years -= 1;
+        months += 12;
+      }
+
+      if (years > 0 && months > 0) {
+        return '$years yr $months mo';
+      } else if (years > 0) {
+        return '$years yr';
+      } else if (months > 0) {
+        return '$months mo';
+      } else {
+        final diffDays = now.difference(exitDate).inDays;
+        return '$diffDays days';
+      }
+    } catch (_) {
+      return 'Departed';
+    }
+  }
+
+  double _calculateStudentPendingDue(Student s, InstitutionProvider provider) {
+    if (s.frozenPendingDue > 0) return s.frozenPendingDue;
+    final stPayments = provider.payments.where((p) => (p.studentId == s.id || p.admissionNo == s.adm) && p.status == 'VALID');
+    final totalPaid = stPayments.fold(0.0, (acc, curr) => acc + curr.amount);
+    final monthlyFee = provider.setting.defaultMonthlyFee;
+    final netMonthly = (monthlyFee - s.concessionAmount) > 0 ? (monthlyFee - s.concessionAmount) : 0.0;
+    final expected = netMonthly * 10;
+    return expected > totalPaid ? (expected - totalPaid) : 0.0;
+  }
+
+  // ========================================================================
   // 3A. DISCONTINUE STUDENT
   // ========================================================================
   Widget _buildDiscontinueStudentTab(InstitutionProvider provider) {
@@ -3652,116 +3714,440 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
       if (sList.isNotEmpty) selectedStudent = sList.first;
     }
 
+    final pendingDue = selectedStudent != null ? _calculateStudentPendingDue(selectedStudent, provider) : 0.0;
+    final collectNowAmt = double.tryParse(_discCollectAmountCtrl.text) ?? 0.0;
+    final remainingDue = (pendingDue - collectNowAmt).clamp(0.0, 999999.0);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header Card
           Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 10, offset: Offset(0, 4))],
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'STUDENT LIFECYCLE',
+                        style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Color(0xFF64748B), letterSpacing: 1.2),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Student Discontinue & Re-admission',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Manage student departures, preserve historical fee dues up to exit date, and re-admit returning students across academic years.',
+                        style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      const Text('ACTIVE ACADEMIC YEAR', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                      const SizedBox(height: 2),
+                      Text(provider.setting.activeAcademicYear, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+
+          // Discontinue Student Action Panel
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 10, offset: Offset(0, 4))],
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Discontinue Student (Archive from Active Rolls)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFE11D48))),
-                const SizedBox(height: 6),
-                const Text('Preserves exact unpaid dues up to departure date. Student is excluded from regular fee cycles and active attendance.', style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
-                const SizedBox(height: 14),
-
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Expanded(
+                    Row(
+                      children: [
+                        Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFFE11D48), shape: BoxShape.circle)),
+                        const SizedBox(width: 8),
+                        const Text('Discontinue Student', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                      ],
+                    ),
+                    const Text('Preserves prior dues · Zero fees during gap', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                  ],
+                ),
+                const Divider(height: 24),
+
+                // Form Grid: Class Filter, Search, Departure Date, Reason
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    SizedBox(
+                      width: 180,
                       child: DropdownButtonFormField<String>(
                         value: _discClassFilter ?? 'ALL',
-                        decoration: const InputDecoration(labelText: '1. Filter Class', border: OutlineInputBorder()),
-                        items: ['ALL', ...provider.classes].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                        decoration: const InputDecoration(labelText: '1. Filter Class', border: OutlineInputBorder(), isDense: true),
+                        items: ['ALL', ...provider.classes].map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12.5)))).toList(),
                         onChanged: (v) => setState(() => _discClassFilter = v),
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      flex: 2,
+                    SizedBox(
+                      width: 280,
                       child: TextField(
                         controller: _discSearchCtrl,
-                        decoration: const InputDecoration(labelText: '2. Search Student Name or Adm #', border: OutlineInputBorder(), prefixIcon: Icon(Icons.search)),
+                        decoration: InputDecoration(
+                          labelText: '2. Search Student *',
+                          hintText: 'Name or Adm No...',
+                          border: const OutlineInputBorder(),
+                          isDense: true,
+                          prefixIcon: const Icon(Icons.search, size: 18),
+                          suffixIcon: _selectedDiscStudentId != null
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear, size: 16),
+                                  onPressed: () => setState(() {
+                                    _selectedDiscStudentId = null;
+                                    _discSearchCtrl.clear();
+                                  }),
+                                )
+                              : null,
+                        ),
                         onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                    SizedBox(
+                      width: 180,
+                      child: TextField(
+                        controller: _discDateCtrl,
+                        decoration: const InputDecoration(labelText: '3. Departure Date *', border: OutlineInputBorder(), isDense: true, prefixIcon: Icon(Icons.calendar_today, size: 16)),
+                      ),
+                    ),
+                    SizedBox(
+                      width: 240,
+                      child: TextField(
+                        controller: _discReasonCtrl,
+                        decoration: const InputDecoration(labelText: '4. Departure Reason', hintText: 'e.g. Relocated, Transfer...', border: OutlineInputBorder(), isDense: true),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
 
-                // Quick Candidate Selector
-                if (matching.isNotEmpty && selectedStudent == null)
+                // Candidate Suggestions
+                if (matching.isNotEmpty && selectedStudent == null && query.isNotEmpty) ...[
+                  const SizedBox(height: 10),
                   Container(
-                    constraints: const BoxConstraints(maxHeight: 180),
-                    decoration: BoxDecoration(border: Border.all(color: const Color(0xFFCBD5E1)), borderRadius: BorderRadius.circular(10)),
+                    constraints: const BoxConstraints(maxHeight: 200),
+                    decoration: BoxDecoration(border: Border.all(color: const Color(0xFFCBD5E1)), borderRadius: BorderRadius.circular(10), color: const Color(0xFFF8FAFC)),
                     child: ListView.separated(
                       shrinkWrap: true,
-                      itemCount: matching.take(6).length,
+                      itemCount: matching.take(8).length,
                       separatorBuilder: (_, __) => const Divider(height: 1),
                       itemBuilder: (ctx, idx) {
                         final s = matching[idx];
+                        final due = _calculateStudentPendingDue(s, provider);
                         return ListTile(
                           dense: true,
+                          leading: CircleAvatar(
+                            radius: 14,
+                            backgroundColor: const Color(0xFFE2E8F0),
+                            child: Text(s.name.isNotEmpty ? s.name[0].toUpperCase() : '?', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+                          ),
                           title: Text('${s.name} (#${s.adm})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
-                          subtitle: Text('Class: ${s.studentClass} • Ph: ${s.mobile}'),
-                          onTap: () => setState(() => _selectedDiscStudentId = s.id),
+                          subtitle: Text('Class: ${s.studentClass} • Guardian: ${s.father.isNotEmpty ? s.father : 'N/A'} • Due: ₹${due.toStringAsFixed(0)}', style: const TextStyle(fontSize: 11)),
+                          trailing: const Icon(Icons.arrow_forward_ios, size: 12, color: Color(0xFF94A3B8)),
+                          onTap: () {
+                            setState(() {
+                              _selectedDiscStudentId = s.id;
+                              _discSearchCtrl.text = '${s.name} (#${s.adm})';
+                              _discCollectAmountCtrl.text = due.toStringAsFixed(0);
+                              _discReceiptNoCtrl.text = provider.nextReceiptNo.toString();
+                            });
+                          },
                         );
                       },
                     ),
                   ),
+                ],
 
+                // Selected Student Preview Card
                 if (selectedStudent != null) ...[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
                   Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: const Color(0xFFFFF1F2), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFFECDD3))),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF1F2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFFECDD3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        Row(
                           children: [
-                            Text(selectedStudent.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-                            Text('Adm: #${selectedStudent.adm} • Class: ${selectedStudent.studentClass} • Status: ${selectedStudent.status}', style: const TextStyle(fontSize: 11.5)),
+                            CircleAvatar(
+                              radius: 20,
+                              backgroundColor: const Color(0xFFF43F5E),
+                              child: Text(selectedStudent.name.isNotEmpty ? selectedStudent.name[0].toUpperCase() : '?', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(selectedStudent.name, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Color(0xFF881337))),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Adm: #${selectedStudent.adm} • Class: ${selectedStudent.studentClass} • Gender: ${selectedStudent.gender} • Academic Year: ${selectedStudent.academicYear}',
+                                    style: const TextStyle(fontSize: 11.5, color: Color(0xFF9F1239)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: const Color(0xFFFDA4AF)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  const Text('UNPAID DUES', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, color: Color(0xFF9F1239))),
+                                  Text('₹${pendingDue.toStringAsFixed(0)}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFFE11D48))),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
-                        TextButton(onPressed: () => setState(() => _selectedDiscStudentId = null), child: const Text('Clear Selection')),
+                        const Divider(height: 18, color: Color(0xFFFECDD3)),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Guardian: ${selectedStudent.father.isNotEmpty ? selectedStudent.father : 'N/A'} • Phone: ${selectedStudent.mobile.isNotEmpty ? selectedStudent.mobile : 'N/A'}',
+                              style: const TextStyle(fontSize: 11.5, color: Color(0xFF4C0519)),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(color: const Color(0xFFFEF3C7), borderRadius: BorderRadius.circular(6), border: Border.all(color: const Color(0xFFFDE68A))),
+                              child: const Text('Archived from active attendance registers', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF92400E))),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(child: TextField(controller: _discDateCtrl, decoration: const InputDecoration(labelText: 'Departure Date', border: OutlineInputBorder()))),
-                      const SizedBox(width: 10),
-                      Expanded(child: TextField(controller: _discReasonCtrl, decoration: const InputDecoration(labelText: 'Departure Reason (e.g. Relocated)', border: OutlineInputBorder()))),
-                    ],
+
+                  const SizedBox(height: 16),
+                  // Unified Fee Settlement Card upon Discontinuation
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        CheckboxListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Row(
+                            children: [
+                              Icon(Icons.receipt_long_rounded, color: Color(0xFF059669), size: 18),
+                              SizedBox(width: 8),
+                              Text('Collect Selected Fees Upon Discontinuation', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Color(0xFF0F172A))),
+                            ],
+                          ),
+                          subtitle: const Text('Optionally settle all or partial outstanding dues immediately at departure', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                          value: _discCollectDuesNow,
+                          activeColor: const Color(0xFF059669),
+                          onChanged: (val) {
+                            setState(() {
+                              _discCollectDuesNow = val ?? false;
+                              if (_discCollectDuesNow) {
+                                _discCollectAmountCtrl.text = pendingDue.toStringAsFixed(0);
+                                if (_discReceiptNoCtrl.text.isEmpty) {
+                                  _discReceiptNoCtrl.text = provider.nextReceiptNo.toString();
+                                }
+                              }
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 8),
+
+                        // Live Summary Metrics Bar
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFCBD5E1))),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              Column(
+                                children: [
+                                  const Text('TOTAL UNPAID', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                                  const SizedBox(height: 2),
+                                  Text('₹${pendingDue.toStringAsFixed(0)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+                                ],
+                              ),
+                              Container(height: 24, width: 1, color: const Color(0xFFE2E8F0)),
+                              Column(
+                                children: [
+                                  const Text('SELECTED TO COLLECT', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF059669))),
+                                  const SizedBox(height: 2),
+                                  Text('₹${_discCollectDuesNow ? collectNowAmt.toStringAsFixed(0) : '0'}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFF059669))),
+                                ],
+                              ),
+                              Container(height: 24, width: 1, color: const Color(0xFFE2E8F0)),
+                              Column(
+                                children: [
+                                  const Text('REMAINING FROZEN DUE', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFFE11D48))),
+                                  const SizedBox(height: 2),
+                                  Text('₹${_discCollectDuesNow ? remainingDue.toStringAsFixed(0) : pendingDue.toStringAsFixed(0)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFFE11D48))),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Payment Details Grid
+                        if (_discCollectDuesNow) ...[
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: [
+                              SizedBox(
+                                width: 160,
+                                child: TextField(
+                                  controller: _discReceiptNoCtrl,
+                                  decoration: const InputDecoration(labelText: 'Receipt No *', border: OutlineInputBorder(), isDense: true),
+                                ),
+                              ),
+                              SizedBox(
+                                width: 160,
+                                child: TextField(
+                                  controller: _discCollectAmountCtrl,
+                                  decoration: const InputDecoration(labelText: 'Amount (₹) *', border: OutlineInputBorder(), isDense: true),
+                                  keyboardType: TextInputType.number,
+                                  onChanged: (_) => setState(() {}),
+                                ),
+                              ),
+                              SizedBox(
+                                width: 160,
+                                child: DropdownButtonFormField<String>(
+                                  value: _discPaymentMode,
+                                  decoration: const InputDecoration(labelText: 'Payment Mode', border: OutlineInputBorder(), isDense: true),
+                                  items: ['CASH', 'ONLINE', 'BANK', 'CHEQUE'].map((m) => DropdownMenuItem(value: m, child: Text(m, style: const TextStyle(fontSize: 12)))).toList(),
+                                  onChanged: (v) => setState(() => _discPaymentMode = v ?? 'CASH'),
+                                ),
+                              ),
+                              SizedBox(
+                                width: 220,
+                                child: TextField(
+                                  controller: _discNotesCtrl,
+                                  decoration: const InputDecoration(labelText: 'Payment Notes', hintText: 'e.g. Cleared on exit', border: OutlineInputBorder(), isDense: true),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 14),
-                  ElevatedButton.icon(
-                    onPressed: () async {
-                      final confirmed = await _confirmAction(
-                        context,
-                        title: 'Discontinue Student',
-                        message: 'Are you sure you want to mark "${selectedStudent!.name}" (#${selectedStudent.adm}) as Discontinued? The student will be moved to the Departed Directory.',
-                        confirmLabel: 'Confirm Departure',
-                        confirmColor: const Color(0xFFE11D48),
-                      );
-                      if (confirmed) {
-                        await provider.discontinueStudent(selectedStudent!, _discReasonCtrl.text.trim(), _discDateCtrl.text.trim());
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${selectedStudent.name} discontinued and archived!')));
-                        setState(() {
-                          _selectedDiscStudentId = null;
-                          _currentModuleIndex = 2;
-                          _currentSubIndex = 1;
-                        });
-                      }
-                    },
-                    icon: const Icon(Icons.person_remove_rounded, size: 16),
-                    label: const Text('Execute Departure'),
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE11D48), foregroundColor: Colors.white),
+
+                  const SizedBox(height: 16),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        final exitDate = _discDateCtrl.text.trim();
+                        final reason = _discReasonCtrl.text.trim().isNotEmpty ? _discReasonCtrl.text.trim() : 'Transfer / Departure';
+
+                        final confirmed = await _confirmAction(
+                          context,
+                          title: 'Confirm Student Departure',
+                          message: 'Are you sure you want to mark "${selectedStudent!.name}" (#${selectedStudent.adm}) as Discontinued?\n\n'
+                              '• Exit Date: $exitDate\n'
+                              '• Reason: $reason\n'
+                              '${_discCollectDuesNow ? '• Settle Fee: ₹${collectNowAmt.toStringAsFixed(0)} (Receipt #${_discReceiptNoCtrl.text.trim()})\n' : ''}'
+                              '• Preserved Frozen Due: ₹${(_discCollectDuesNow ? remainingDue : pendingDue).toStringAsFixed(0)}\n\n'
+                              'Student will be archived from active attendance registers and excluded from future automated monthly billing cycles.',
+                          confirmLabel: 'Discontinue Student',
+                          confirmColor: const Color(0xFFE11D48),
+                        );
+
+                        if (confirmed) {
+                          Map<String, dynamic>? settlementDetails;
+                          if (_discCollectDuesNow && collectNowAmt > 0) {
+                            settlementDetails = {
+                              'amount': collectNowAmt,
+                              'receiptNo': _discReceiptNoCtrl.text.trim().isNotEmpty ? _discReceiptNoCtrl.text.trim() : provider.nextReceiptNo.toString(),
+                              'paymentMode': _discPaymentMode,
+                              'notes': _discNotesCtrl.text.trim().isNotEmpty ? _discNotesCtrl.text.trim() : 'Exit settlement',
+                            };
+                          }
+
+                          await provider.discontinueStudent(
+                            selectedStudent,
+                            reason,
+                            exitDate,
+                            frozenPendingDue: _discCollectDuesNow ? remainingDue : pendingDue,
+                            settlementDetails: settlementDetails,
+                          );
+
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('${selectedStudent.name} (#${selectedStudent.adm}) archived to Departed Directory.'),
+                                backgroundColor: const Color(0xFFE11D48),
+                              ),
+                            );
+                            setState(() {
+                              _selectedDiscStudentId = null;
+                              _discSearchCtrl.clear();
+                              _discCollectDuesNow = false;
+                              _currentSubIndex = 1; // Switch to Departed Directory
+                            });
+                          }
+                        }
+                      },
+                      icon: const Icon(Icons.person_remove_rounded, size: 18),
+                      label: const Text('Discontinue Student', style: TextStyle(fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFE11D48),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
                   ),
                 ],
               ],
@@ -3772,96 +4158,531 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
     );
   }
 
+  // ========================================================================
   // 3B. DEPARTED DIRECTORY
+  // ========================================================================
   Widget _buildDepartedDirectoryTab(InstitutionProvider provider) {
-    final departed = provider.discontinuedStudents;
-    return ListView(
+    final departedStudents = provider.discontinuedStudents;
+    final totalDeparted = departedStudents.length;
+    final totalPreservedDues = departedStudents.fold(0.0, (acc, s) => acc + s.frozenPendingDue);
+
+    final q = _departedSearchCtrl.text.trim().toLowerCase();
+    final filtered = departedStudents.where((s) {
+      if (_departedClassFilter != null && _departedClassFilter != 'ALL' && s.studentClass != _departedClassFilter) return false;
+      if (q.isNotEmpty) {
+        return s.name.toLowerCase().contains(q) || s.adm.toLowerCase().contains(q) || s.exitReason.toLowerCase().contains(q);
+      }
+      return true;
+    }).toList();
+
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
-      children: [
-        Text('Discontinued Students Directory (${departed.length})', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
-        if (departed.isEmpty)
-          const Center(child: Padding(padding: EdgeInsets.all(30), child: Text('No departed students on record.')))
-        else
-          ...departed.map((s) => Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Directory Header Card with Metrics
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 10, offset: Offset(0, 4))],
+            ),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircleAvatar(backgroundColor: const Color(0xFFFFF1F2), child: const Icon(Icons.person_off_rounded, color: Color(0xFFBE123C), size: 18)),
-                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('${s.name} (#${s.adm})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                      Text('Exit Class: ${s.studentClass} • Exit Date: ${s.exitDate.isNotEmpty ? s.exitDate : '-'} • Reason: ${s.exitReason.isNotEmpty ? s.exitReason : 'None specified'}', style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
+                      const Text('DEPARTED DIRECTORY', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Color(0xFF64748B), letterSpacing: 1.2)),
+                      const SizedBox(height: 4),
+                      const Text('Discontinued Students Directory', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+                      const SizedBox(height: 4),
+                      const Text('Archive of past student departures with recorded reasons, preserved dues, and multi-year re-admission.', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B))),
                     ],
                   ),
                 ),
-                ElevatedButton(
-                  onPressed: () => _showReadmitModal(s, provider),
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF059669), foregroundColor: Colors.white),
-                  child: const Text('Re-admit', style: TextStyle(fontSize: 12)),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFE2E8F0))),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          const Text('TOTAL DEPARTED', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                          const SizedBox(height: 2),
+                          Text('$totalDeparted', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(color: const Color(0xFFFFF1F2), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFFECDD3))),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          const Text('PRESERVED DUES', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF9F1239))),
+                          const SizedBox(height: 2),
+                          Text('₹${totalPreservedDues.toStringAsFixed(0)}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFFE11D48))),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          )),
-      ],
+          ),
+          const SizedBox(height: 18),
+
+          // Search and Filters Bar
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _departedSearchCtrl,
+                    decoration: const InputDecoration(
+                      hintText: 'Search by name, admission no, or reason...',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      prefixIcon: Icon(Icons.search, size: 18),
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                SizedBox(
+                  width: 200,
+                  child: DropdownButtonFormField<String>(
+                    value: _departedClassFilter ?? 'ALL',
+                    decoration: const InputDecoration(labelText: 'Exit Class', border: OutlineInputBorder(), isDense: true),
+                    items: ['ALL', ...provider.classes].map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12.5)))).toList>,
+                    onChanged: (v) => setState(() => _departedClassFilter = v),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Students List / Table
+          if (filtered.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(40),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
+              child: Column(
+                children: [
+                  Icon(Icons.person_off_outlined, size: 48, color: Colors.grey.shade400),
+                  const SizedBox(height: 12),
+                  const Text('No discontinued students found matching your criteria.', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
+                ],
+              ),
+            )
+          else
+            ...filtered.map((s) {
+              final gap = _calculateGapDuration(s.exitDate);
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: const [BoxShadow(color: Color(0x060F172A), blurRadius: 6, offset: Offset(0, 2))],
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 22,
+                      backgroundColor: const Color(0xFFFFF1F2),
+                      child: const Icon(Icons.person_off_rounded, color: Color(0xFFE11D48), size: 20),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(s.name, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Color(0xFF0F172A))),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(4)),
+                                child: Text('#${s.adm}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(color: const Color(0xFFFEF3C7), borderRadius: BorderRadius.circular(6)),
+                                child: Text('$gap gap', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF92400E))),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Exit Class: ${s.studentClass} • Exit Date: ${s.exitDate.isNotEmpty ? s.exitDate : 'N/A'} • Reason: ${s.exitReason.isNotEmpty ? s.exitReason : 'None specified'}',
+                            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Guardian: ${s.father.isNotEmpty ? s.father : 'N/A'} • Phone: ${s.mobile.isNotEmpty ? s.mobile : 'N/A'}',
+                            style: const TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    // Preserved Dues Status Badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: s.frozenPendingDue > 0 ? const Color(0xFFFFF1F2) : const Color(0xFFECFDF5),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: s.frozenPendingDue > 0 ? const Color(0xFFFECDD3) : const Color(0xFFA7F3D0)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text('PRESERVED DUE', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: s.frozenPendingDue > 0 ? const Color(0xFF9F1239) : const Color(0xFF065F46))),
+                          Text('₹${s.frozenPendingDue.toStringAsFixed(0)}', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: s.frozenPendingDue > 0 ? const Color(0xFFE11D48) : const Color(0xFF059669))),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Action Buttons
+                    Row(
+                      children: [
+                        if (s.frozenPendingDue > 0)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: OutlinedButton.icon(
+                              onPressed: () => _showSettleDepartedDuesModal(s, provider),
+                              icon: const Icon(Icons.receipt_long_rounded, size: 15),
+                              label: const Text('Settle Due', style: TextStyle(fontSize: 12)),
+                              style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF2563EB), side: const BorderSide(color: Color(0xFF93C5FD))),
+                            ),
+                          ),
+                        ElevatedButton.icon(
+                          onPressed: () => _showReadmitModal(s, provider),
+                          icon: const Icon(Icons.login_rounded, size: 15),
+                          label: const Text('Re-admit', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF059669), foregroundColor: Colors.white),
+                        ),
+                        const SizedBox(width: 6),
+                        IconButton(
+                          icon: const Icon(Icons.history_rounded, size: 20, color: Color(0xFF64748B)),
+                          tooltip: 'Continuity Trajectory',
+                          onPressed: () => _showStudentHistoryModal(s),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            }),
+        ],
+      ),
     );
   }
 
+  // ========================================================================
+  // 3C. RE-ADMISSION WIZARD & MODAL
+  // ========================================================================
   void _showReadmitModal(Student s, InstitutionProvider provider) {
-    String targetClass = provider.classes.isNotEmpty ? provider.classes.first : s.studentClass;
+    String targetClass = provider.classes.contains(s.studentClass)
+        ? s.studentClass
+        : (provider.classes.isNotEmpty ? provider.classes.first : s.studentClass);
     String targetYear = provider.setting.activeAcademicYear;
-    final notesCtrl = TextEditingController(text: 'Re-admitted after gap');
+    final notesCtrl = TextEditingController(text: 'Re-admitted after academic gap');
+    final returnDateCtrl = TextEditingController(text: DateTime.now().toString().split(' ')[0]);
+    final gapDuration = _calculateGapDuration(s.exitDate);
+
+    String duesStrategy = s.frozenPendingDue > 0 ? 'carry_forward' : 'waive';
+    final settleReceiptCtrl = TextEditingController(text: provider.nextReceiptNo.toString());
+    final settleAmountCtrl = TextEditingController(text: s.frozenPendingDue.toStringAsFixed(0));
+    String settlePaymentMode = 'CASH';
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDlg) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('Re-admit: ${s.name}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+          titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          title: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(8)),
-                child: const Text('Zero fee guarantee for inactive gap years. Fee starts strictly upon re-admission.', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF047857))),
+              Row(
+                children: [
+                  Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF059669), shape: BoxShape.circle)),
+                  const SizedBox(width: 8),
+                  const Text('Student Re-admission Wizard', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Color(0xFF0F172A))),
+                ],
               ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                value: targetClass,
-                decoration: const InputDecoration(labelText: 'Target Class *', border: OutlineInputBorder()),
-                items: provider.classes.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                onChanged: (v) => setDlg(() => targetClass = v ?? targetClass),
-              ),
-              const SizedBox(height: 8),
-              TextField(controller: notesCtrl, decoration: const InputDecoration(labelText: 'Notes', border: OutlineInputBorder())),
+              IconButton(icon: const Icon(Icons.close, size: 20), onPressed: () => Navigator.pop(ctx)),
             ],
           ),
+          content: SizedBox(
+            width: 500,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Student Summary Box
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFE2E8F0))),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 18,
+                          backgroundColor: const Color(0xFF059669),
+                          child: Text(s.name.isNotEmpty ? s.name[0].toUpperCase() : '?', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(s.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5, color: Color(0xFF0F172A))),
+                              Text('Adm: #${s.adm} • Exit Class: ${s.studentClass} • Exit Date: ${s.exitDate.isNotEmpty ? s.exitDate : 'N/A'}', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                              if (s.exitReason.isNotEmpty) Text('Exit Reason: ${s.exitReason}', style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Color(0xFF64748B))),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Target Academic Year & Target Class
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: targetYear,
+                          decoration: const InputDecoration(labelText: 'Target Academic Year *', border: OutlineInputBorder(), isDense: true),
+                          items: provider.academicYears.map((y) => DropdownMenuItem(value: y.name, child: Text(y.name, style: const TextStyle(fontSize: 12.5)))).toList(),
+                          onChanged: (v) => setDlg(() => targetYear = v ?? targetYear),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: targetClass,
+                          decoration: const InputDecoration(labelText: 'Target New Class *', border: OutlineInputBorder(), isDense: true),
+                          items: provider.classes.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12.5)))).toList(),
+                          onChanged: (v) => setDlg(() => targetClass = v ?? targetClass),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Return Date & Notes
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: returnDateCtrl,
+                          decoration: const InputDecoration(labelText: 'Return / Re-admission Date *', border: OutlineInputBorder(), isDense: true, prefixIcon: Icon(Icons.calendar_today, size: 16)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: notesCtrl,
+                    decoration: const InputDecoration(labelText: 'Re-admission Notes / Reason for Return', hintText: 'e.g. Returned after gap, re-enrolling in Class 5...', border: OutlineInputBorder(), isDense: true),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Gap & Fee Protection Preview Box
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFA7F3D0))),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Academic Gap Trajectory', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF065F46))),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6), border: Border.all(color: const Color(0xFFA7F3D0))),
+                              child: Text(gapDuration, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF047857))),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Guaranteed: Zero fees will be charged for gap years. New regular monthly billing will start strictly upon re-admission.',
+                          style: TextStyle(fontSize: 11.5, color: Color(0xFF047857), height: 1.3),
+                        ),
+                        const Divider(height: 16, color: Color(0xFFA7F3D0)),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Preserved Prior Unpaid Dues:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF065F46))),
+                            Text('₹${s.frozenPendingDue.toStringAsFixed(0)}', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: s.frozenPendingDue > 0 ? const Color(0xFFE11D48) : const Color(0xFF059669))),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Dues Reconciliation Strategy (if preserved dues > 0)
+                  if (s.frozenPendingDue > 0) ...[
+                    const SizedBox(height: 14),
+                    const Text('Dues Reconciliation Strategy *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                    const SizedBox(height: 6),
+                    Column(
+                      children: [
+                        RadioListTile<String>(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Carry Forward', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                          subtitle: Text('Retain ₹${s.frozenPendingDue.toStringAsFixed(0)} as opening pending due on active ledger', style: const TextStyle(fontSize: 11)),
+                          value: 'carry_forward',
+                          groupValue: duesStrategy,
+                          onChanged: (v) => setDlg(() => duesStrategy = v ?? 'carry_forward'),
+                        ),
+                        RadioListTile<String>(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Administrative Waiver', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                          subtitle: const Text('Forgive / clear past unpaid dues to ₹0 upon re-admission', style: TextStyle(fontSize: 11)),
+                          value: 'waive',
+                          groupValue: duesStrategy,
+                          onChanged: (v) => setDlg(() => duesStrategy = v ?? 'waive'),
+                        ),
+                        RadioListTile<String>(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Collect & Settle Now', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                          subtitle: const Text('Collect outstanding payment immediately before restoring to active rolls', style: TextStyle(fontSize: 11)),
+                          value: 'settle_now',
+                          groupValue: duesStrategy,
+                          onChanged: (v) => setDlg(() => duesStrategy = v ?? 'settle_now'),
+                        ),
+                      ],
+                    ),
+                    if (duesStrategy == 'settle_now') ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(8)),
+                        child: Row(
+                          children: [
+                            Expanded(child: TextField(controller: settleAmountCtrl, decoration: const InputDecoration(labelText: 'Amount (₹)', border: OutlineInputBorder(), isDense: true))),
+                            const SizedBox(width: 8),
+                            Expanded(child: TextField(controller: settleReceiptCtrl, decoration: const InputDecoration(labelText: 'Receipt #', border: OutlineInputBorder(), isDense: true))),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                value: settlePaymentMode,
+                                decoration: const InputDecoration(labelText: 'Mode', border: OutlineInputBorder(), isDense: true),
+                                items: ['CASH', 'ONLINE', 'BANK'].map((m) => DropdownMenuItem(value: m, child: Text(m, style: const TextStyle(fontSize: 11)))).toList(),
+                                onChanged: (v) => setDlg(() => settlePaymentMode = v ?? 'CASH'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ],
+              ),
+            ),
+          ),
+          actionsPadding: const EdgeInsets.all(16),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF059669), foregroundColor: Colors.white),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF059669),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
               onPressed: () async {
                 final confirmed = await _confirmAction(
                   context,
                   title: 'Confirm Re-admission',
-                  message: 'Are you sure you want to re-admit "${s.name}" (#${s.adm}) to class "$targetClass" for academic year "$targetYear"?',
+                  message: 'Are you sure you want to re-admit "${s.name}" (#${s.adm}) to class "$targetClass" for academic year "$targetYear"?\n\n'
+                      '• Return Date: ${returnDateCtrl.text.trim()}\n'
+                      '• Inactive Gap: $gapDuration (Zero fees during gap)\n'
+                      '• Dues Strategy: ${duesStrategy.toUpperCase()}',
                   confirmLabel: 'Re-admit Student',
                   confirmColor: const Color(0xFF059669),
                 );
+
                 if (confirmed) {
-                  await provider.readmitStudent(s, targetClass, targetYear, notesCtrl.text.trim());
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${s.name} re-admitted to $targetClass!')));
+                  double finalRestoredDues = 0.0;
+                  if (duesStrategy == 'carry_forward') {
+                    finalRestoredDues = s.frozenPendingDue;
+                  } else if (duesStrategy == 'settle_now') {
+                    final amt = double.tryParse(settleAmountCtrl.text) ?? s.frozenPendingDue;
+                    finalRestoredDues = (s.frozenPendingDue - amt).clamp(0.0, 999999.0);
+                    // Collect payment record
+                    await provider.collectPayment(
+                      Payment(
+                        id: '',
+                        receiptNo: int.tryParse(settleReceiptCtrl.text) ?? provider.nextReceiptNo,
+                        studentId: s.id,
+                        admissionNo: s.adm,
+                        studentName: s.name,
+                        studentClass: targetClass,
+                        academicYear: targetYear,
+                        amount: amt,
+                        paymentMode: settlePaymentMode,
+                        collectedBy: provider.currentStaff?.name ?? 'Admin',
+                        paymentDate: returnDateCtrl.text.trim(),
+                        status: 'VALID',
+                        month: 'Re-admission Settlement',
+                        items: [FeeItem(name: 'Preserved Gap Dues Settlement', amount: amt, isDefaultMonthly: false)],
+                      ),
+                    );
+                  }
+
+                  await provider.readmitStudent(
+                    s,
+                    targetClass,
+                    targetYear,
+                    notesCtrl.text.trim(),
+                    returnDate: returnDateCtrl.text.trim(),
+                    restoredDues: finalRestoredDues,
+                    duesStrategy: duesStrategy,
+                  );
+
+                  if (mounted) {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('${s.name} re-admitted to Class $targetClass successfully!'),
+                        backgroundColor: const Color(0xFF059669),
+                      ),
+                    );
+                    setState(() {});
+                  }
                 }
               },
-              child: const Text('Confirm Re-admission'),
+              icon: const Icon(Icons.person_add_alt_1_rounded, size: 16),
+              label: const Text('Confirm Re-admission', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -3869,48 +4690,381 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
     );
   }
 
-  // 3C. RE-ADMISSION WIZARD
+  // ========================================================================
+  // 3D. SETTLE DEPARTED DUES MODAL
+  // ========================================================================
+  void _showSettleDepartedDuesModal(Student s, InstitutionProvider provider) {
+    final amtCtrl = TextEditingController(text: s.frozenPendingDue.toStringAsFixed(0));
+    final rcptCtrl = TextEditingController(text: provider.nextReceiptNo.toString());
+    String mode = 'CASH';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('Settle Preserved Dues: ${s.name}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Student Adm: #${s.adm} • Exit Class: ${s.studentClass}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: const Color(0xFFFFF1F2), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFFECDD3))),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Total Preserved Due:', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF9F1239))),
+                    Text('₹${s.frozenPendingDue.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Color(0xFFE11D48))),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              TextField(controller: amtCtrl, decoration: const InputDecoration(labelText: 'Settlement Amount (₹) *', border: OutlineInputBorder()), keyboardType: TextInputType.number),
+              const SizedBox(height: 10),
+              TextField(controller: rcptCtrl, decoration: const InputDecoration(labelText: 'Receipt Number *', border: OutlineInputBorder())),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                value: mode,
+                decoration: const InputDecoration(labelText: 'Payment Mode', border: OutlineInputBorder()),
+                items: ['CASH', 'ONLINE', 'BANK'].map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                onChanged: (v) => setDlg(() => mode = v ?? 'CASH'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF059669), foregroundColor: Colors.white),
+              onPressed: () async {
+                final amt = double.tryParse(amtCtrl.text) ?? 0.0;
+                if (amt <= 0) return;
+                await provider.settleDepartedStudentDues(s, amt, rcptCtrl.text.trim(), mode);
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Settled ₹${amt.toStringAsFixed(0)} for ${s.name}!')));
+                  setState(() {});
+                }
+              },
+              child: const Text('Record Settlement'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ========================================================================
+  // 3E. STUDENT CONTINUITY TRAJECTORY HISTORY MODAL
+  // ========================================================================
+  void _showStudentHistoryModal(Student s) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.history_rounded, color: Color(0xFF2563EB), size: 22),
+                const SizedBox(width: 8),
+                Text('Continuity Trajectory: ${s.name}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              ],
+            ),
+            IconButton(icon: const Icon(Icons.close, size: 20), onPressed: () => Navigator.pop(ctx)),
+          ],
+        ),
+        content: SizedBox(
+          width: 500,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Adm #${s.adm} • Class: ${s.studentClass} • Status: ${s.status}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+              const Divider(height: 18),
+              if (s.continuityLog.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(child: Text('No historical continuity events logged for this student.', style: TextStyle(color: Color(0xFF94A3B8)))),
+                )
+              else
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: s.continuityLog.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (ctx, idx) {
+                      // Reverse order to show newest first
+                      final entry = s.continuityLog[s.continuityLog.length - 1 - idx] as Map<String, dynamic>;
+                      final action = (entry['action'] ?? 'EVENT').toString();
+                      final isDisc = action == 'DISCONTINUED';
+                      final isReadmit = action == 'READMITTED';
+                      final color = isDisc ? const Color(0xFFE11D48) : (isReadmit ? const Color(0xFF059669) : const Color(0xFF2563EB));
+
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
+                              child: Icon(isDisc ? Icons.person_remove_rounded : (isReadmit ? Icons.person_add_alt_1_rounded : Icons.info_outline_rounded), size: 16, color: color),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(action, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color)),
+                                      Text(entry['timestamp']?.toString().split('T')[0] ?? entry['date']?.toString() ?? '', style: const TextStyle(fontSize: 10.5, color: Color(0xFF94A3B8))),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(entry['reason'] ?? entry['notes'] ?? entry['details'] ?? 'No notes recorded', style: const TextStyle(fontSize: 11.5, color: Color(0xFF334155))),
+                                  if (entry['frozenDue'] != null) Text('Frozen Dues: ₹${entry['frozenDue']}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFE11D48))),
+                                  if (entry['targetClass'] != null) Text('Target Class: ${entry['targetClass']} (${entry['targetYear'] ?? ''})', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+        ],
+      ),
+    );
+  }
+
+  // ========================================================================
+  // 3F. RE-ADMISSION TAB VIEW
+  // ========================================================================
   Widget _buildReadmissionTab(InstitutionProvider provider) {
     return _buildDepartedDirectoryTab(provider);
   }
 
-  // 3D. CONTINUITY TIMELINE
+  // ========================================================================
+  // 3G. CONTINUITY TIMELINE AUDIT TAB
+  // ========================================================================
   Widget _buildContinuityTimelineTab(InstitutionProvider provider) {
-    final logEntries = <Map<String, dynamic>>[];
+    final allEntries = <Map<String, dynamic>>[];
     for (final s in provider.students) {
       for (final log in s.continuityLog) {
-        logEntries.add({'student': s.name, 'adm': s.adm, ...log});
+        if (log is Map<String, dynamic>) {
+          allEntries.add({
+            'studentId': s.id,
+            'studentName': s.name,
+            'studentAdm': s.adm,
+            'studentClass': s.studentClass,
+            ...log,
+          });
+        }
       }
     }
-    return ListView(
+
+    // Sort descending by timestamp/date
+    allEntries.sort((a, b) {
+      final ta = (a['timestamp'] ?? a['date'] ?? '').toString();
+      final tb = (b['timestamp'] ?? b['date'] ?? '').toString();
+      return tb.compareTo(ta);
+    });
+
+    final q = _timelineSearchCtrl.text.trim().toLowerCase();
+    final filtered = allEntries.where((e) {
+      if (_timelineSelectedStudentId != null && _timelineSelectedStudentId != 'ALL' && e['studentId'] != _timelineSelectedStudentId) {
+        return false;
+      }
+      if (q.isNotEmpty) {
+        final name = (e['studentName'] ?? '').toString().toLowerCase();
+        final adm = (e['studentAdm'] ?? '').toString().toLowerCase();
+        final reason = (e['reason'] ?? e['notes'] ?? '').toString().toLowerCase();
+        final action = (e['action'] ?? '').toString().toLowerCase();
+        return name.contains(q) || adm.contains(q) || reason.contains(q) || action.contains(q);
+      }
+      return true;
+    }).toList();
+
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
-      children: [
-        Text('Continuity & Departure Audit Timeline (${logEntries.length})', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
-        if (logEntries.isEmpty)
-          const Center(child: Padding(padding: EdgeInsets.all(30), child: Text('No departure or re-admission events recorded.')))
-        else
-          ...logEntries.map((l) => Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFE2E8F0))),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Card
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 10, offset: Offset(0, 4))],
+            ),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(l['action'] == 'DISCONTINUED' ? Icons.exit_to_app_rounded : Icons.login_rounded, size: 18, color: l['action'] == 'DISCONTINUED' ? const Color(0xFFE11D48) : const Color(0xFF059669)),
-                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('${l['action']}: ${l['student']} (#${l['adm']})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                      Text('Date: ${l['date']} • Notes: ${l['reason'] ?? l['notes'] ?? '-'}', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                      const Text('LIFECYCLE AUDIT TRAIL', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Color(0xFF64748B), letterSpacing: 1.2)),
+                      const SizedBox(height: 4),
+                      const Text('Continuity & Departure Audit Timeline', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+                      const SizedBox(height: 4),
+                      const Text('Immutable historical log of all student promotions, departures, fee reconciliations, and multi-year re-admissions.', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B))),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFE2E8F0))),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      const Text('TOTAL EVENTS', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                      const SizedBox(height: 2),
+                      Text('${allEntries.length}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
                     ],
                   ),
                 ),
               ],
             ),
-          )),
-      ],
+          ),
+          const SizedBox(height: 18),
+
+          // Filters Bar
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _timelineSearchCtrl,
+                    decoration: const InputDecoration(
+                      hintText: 'Search by student, admission #, action, or reason...',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      prefixIcon: Icon(Icons.search, size: 18),
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                SizedBox(
+                  width: 240,
+                  child: DropdownButtonFormField<String>(
+                    value: _timelineSelectedStudentId ?? 'ALL',
+                    decoration: const InputDecoration(labelText: 'Filter Student', border: OutlineInputBorder(), isDense: true),
+                    items: [
+                      const DropdownMenuItem(value: 'ALL', child: Text('All Students', style: TextStyle(fontSize: 12.5))),
+                      ...provider.students.map((s) => DropdownMenuItem(value: s.id, child: Text('${s.name} (#${s.adm})', style: const TextStyle(fontSize: 12.5), overflow: TextOverflow.ellipsis))),
+                    ],
+                    onChanged: (v) => setState(() => _timelineSelectedStudentId = v),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Timeline Event Cards
+          if (filtered.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(40),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
+              child: Column(
+                children: [
+                  Icon(Icons.timeline_rounded, size: 48, color: Colors.grey.shade400),
+                  const SizedBox(height: 12),
+                  const Text('No continuity events match your search filters.', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
+                ],
+              ),
+            )
+          else
+            ...filtered.map((e) {
+              final action = (e['action'] ?? 'EVENT').toString();
+              final isDisc = action == 'DISCONTINUED';
+              final isReadmit = action == 'READMITTED';
+              final isSettled = action == 'DUES_SETTLED';
+              final color = isDisc ? const Color(0xFFE11D48) : (isReadmit ? const Color(0xFF059669) : (isSettled ? const Color(0xFFD97706) : const Color(0xFF2563EB)));
+              final icon = isDisc ? Icons.person_remove_rounded : (isReadmit ? Icons.login_rounded : (isSettled ? Icons.receipt_long_rounded : Icons.info_outline_rounded));
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: const [BoxShadow(color: Color(0x060F172A), blurRadius: 6, offset: Offset(0, 2))],
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(color: color.withOpacity(0.12), shape: BoxShape.circle),
+                      child: Icon(icon, size: 18, color: color),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(action, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: color)),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(4)),
+                                    child: Text('${e['studentName']} (#${e['studentAdm']})', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+                                  ),
+                                ],
+                              ),
+                              Text(e['timestamp']?.toString().split('T')[0] ?? e['date']?.toString() ?? '', style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(e['reason'] ?? e['notes'] ?? e['details'] ?? 'Lifecycle update processed.', style: const TextStyle(fontSize: 12, color: Color(0xFF475569))),
+                          const SizedBox(height: 4),
+                          Wrap(
+                            spacing: 10,
+                            children: [
+                              if (e['exitClass'] != null) Text('Exit Class: ${e['exitClass']}', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                              if (e['targetClass'] != null) Text('Target Class: ${e['targetClass']} (${e['targetYear'] ?? ''})', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                              if (e['frozenDue'] != null) Text('Preserved Due: ₹${e['frozenDue']}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFE11D48))),
+                              if (e['settledAmount'] != null) Text('Settled: ₹${e['settledAmount']}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF059669))),
+                              if (e['duesStrategy'] != null) Text('Strategy: ${e['duesStrategy'].toString().toUpperCase()}', style: const TextStyle(fontSize: 11, color: Color(0xFF2563EB))),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+        ],
+      ),
     );
   }
 

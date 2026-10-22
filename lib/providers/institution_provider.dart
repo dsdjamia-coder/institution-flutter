@@ -493,46 +493,128 @@ class InstitutionProvider extends ChangeNotifier {
   }
 
   // ==================== CONTINUITY & ALUMNI ====================
-  /// Discontinue student
-  Future<void> discontinueStudent(Student student, String reason, String exitDate) async {
+  /// Discontinue student with frozen dues retention and settlement
+  Future<void> discontinueStudent(
+    Student student,
+    String reason,
+    String exitDate, {
+    double frozenPendingDue = 0.0,
+    Map<String, dynamic>? settlementDetails,
+  }) async {
+    final logEntry = {
+      'action': 'DISCONTINUED',
+      'date': exitDate,
+      'reason': reason,
+      'class': student.studentClass,
+      'academicYear': student.academicYear,
+      'frozenDue': frozenPendingDue,
+      if (settlementDetails != null) 'settlement': settlementDetails,
+    };
+
     final updated = student.copyWith(
       status: 'Discontinued',
       exitReason: reason,
       exitDate: exitDate,
+      frozenPendingDue: frozenPendingDue,
       continuityLog: [
         ...student.continuityLog,
-        {
-          'action': 'DISCONTINUED',
-          'date': exitDate,
-          'reason': reason,
-          'class': student.studentClass,
-          'academicYear': student.academicYear,
-        }
+        logEntry,
       ],
     );
     await updateStudent(updated);
+    await addAuditLog('student', 'DISCONTINUE_STUDENT', 'Discontinued ${student.name} (#${student.adm}) with frozen due: ₹$frozenPendingDue');
   }
 
-  /// Re-admit student after gap years
-  Future<void> readmitStudent(Student student, String targetClass, String targetYear, String reason) async {
-    final returnDate = DateTime.now().toString().split(' ')[0];
+  /// Re-admit student after gap years with zero gap fee guarantee and dues strategy
+  Future<void> readmitStudent(
+    Student student,
+    String targetClass,
+    String targetYear,
+    String reason, {
+    int? newRoll,
+    String? returnDate,
+    double restoredDues = 0.0,
+    String duesStrategy = 'carry_forward',
+  }) async {
+    final retDate = returnDate ?? DateTime.now().toString().split(' ')[0];
+    final logEntry = {
+      'action': 'READMITTED',
+      'date': retDate,
+      'targetClass': targetClass,
+      'targetYear': targetYear,
+      'notes': reason,
+      'duesStrategy': duesStrategy,
+      'restoredDues': restoredDues,
+    };
+
     final updated = student.copyWith(
       status: 'Active',
       studentClass: targetClass,
       academicYear: targetYear,
-      returnDate: returnDate,
+      roll: newRoll ?? student.roll,
+      returnDate: retDate,
+      frozenPendingDue: duesStrategy == 'waive' ? 0.0 : (duesStrategy == 'settle_now' ? 0.0 : restoredDues),
       continuityLog: [
         ...student.continuityLog,
-        {
-          'action': 'READMITTED',
-          'date': returnDate,
-          'targetClass': targetClass,
-          'targetYear': targetYear,
-          'notes': reason,
-        }
+        logEntry,
       ],
     );
     await updateStudent(updated);
+    await addAuditLog('student', 'READMIT_STUDENT', 'Re-admitted ${student.name} (#${student.adm}) to $targetClass ($targetYear)');
+  }
+
+  /// Settle preserved dues for a departed student
+  Future<void> settleDepartedStudentDues(
+    Student student,
+    double amount,
+    String receiptNo,
+    String paymentMode,
+  ) async {
+    final remainingDue = (student.frozenPendingDue - amount).clamp(0.0, double.infinity);
+    final logEntry = {
+      'action': 'DEPARTED_DUE_SETTLED',
+      'date': DateTime.now().toString().split(' ')[0],
+      'amount': amount,
+      'receiptNo': receiptNo,
+      'mode': paymentMode,
+      'remainingDue': remainingDue,
+    };
+
+    final updated = student.copyWith(
+      frozenPendingDue: remainingDue,
+      continuityLog: [
+        ...student.continuityLog,
+        logEntry,
+      ],
+    );
+    await updateStudent(updated);
+
+    final payment = Payment(
+      id: 'pay_${DateTime.now().millisecondsSinceEpoch}',
+      paymentId: 'pay_${DateTime.now().millisecondsSinceEpoch}',
+      receiptNo: int.tryParse(receiptNo) ?? 1001,
+      studentId: student.id,
+      admissionNo: student.adm,
+      studentName: student.name,
+      studentClass: student.studentClass,
+      academicYear: student.academicYear,
+      amount: amount,
+      paymentDate: DateTime.now().toString().split(' ')[0],
+      paymentMode: paymentMode,
+      feeItems: [
+        FeeItemEntry(
+          itemKey: 'DEPARTED_DUES',
+          itemLabel: 'Departed Preserved Dues Settlement',
+          amount: amount,
+          period: 'Settlement',
+          ledgerKey: '${student.id}_${student.academicYear}_DEPARTED_DUES',
+        ),
+      ],
+      collectedByName: 'Admin Desk',
+      status: 'VALID',
+    );
+    await collectPayment(payment);
+    await addAuditLog('fee', 'DEPARTED_DUE_SETTLED', 'Settled ₹$amount for departed student ${student.name} (#${student.adm})');
   }
 
   /// Promote class students to next class or Alumni
