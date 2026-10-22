@@ -815,6 +815,52 @@ class FirestoreService {
     return const JsonEncoder.withIndent('  ').convert(snapshot);
   }
 
+  Future<Map<String, dynamic>> restoreDatabaseJson(String jsonString) async {
+    try {
+      final Map<String, dynamic> data = jsonDecode(jsonString);
+      int restoredStudents = 0;
+      int restoredStaff = 0;
+
+      if (data['institution'] is Map<String, dynamic>) {
+        final setting = InstitutionSetting.fromMap(data['institution']);
+        await saveSettings(setting);
+      }
+
+      if (data['classes'] is List) {
+        final classes = List<String>.from(data['classes']);
+        await saveClasses(classes);
+      }
+
+      if (data['students'] is List) {
+        for (final item in data['students']) {
+          if (item is Map<String, dynamic>) {
+            final s = Student.fromMap(item, item['id']?.toString() ?? '');
+            await saveStudent(s);
+            restoredStudents++;
+          }
+        }
+      }
+
+      if (data['staff'] is List) {
+        for (final item in data['staff']) {
+          if (item is Map<String, dynamic>) {
+            final st = Staff.fromMap(item, item['id']?.toString() ?? '');
+            await saveStaff(st);
+            restoredStaff++;
+          }
+        }
+      }
+
+      return {
+        'success': true,
+        'studentsRestored': restoredStudents,
+        'staffRestored': restoredStaff,
+      };
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
   // ==================== FIREBASE AUTH CREDENTIALS UPDATE ====================
   Future<Map<String, dynamic>?> updateAdminCredentials({
     required String idToken,

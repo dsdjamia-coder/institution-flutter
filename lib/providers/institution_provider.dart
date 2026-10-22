@@ -420,6 +420,15 @@ class InstitutionProvider extends ChangeNotifier {
     return await _firestoreService.exportDatabaseJson();
   }
 
+  Future<Map<String, dynamic>> restoreBackupJson(String jsonString) async {
+    final result = await _firestoreService.restoreDatabaseJson(jsonString);
+    if (result['success'] == true) {
+      await init();
+      await addAuditLog('backup', 'RESTORE_BACKUP', 'Restored database from JSON: ${result['studentsRestored']} students, ${result['staffRestored']} staff');
+    }
+    return result;
+  }
+
   // ==================== STAFF MANAGEMENT ====================
   Future<void> addStaff(Staff staff) async {
     _staffList.add(staff);
