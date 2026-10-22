@@ -25,14 +25,7 @@ class AdminConsoleScreen extends StatefulWidget {
 
 class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
   int _currentModuleIndex = 0;
-
-  // Subtab indices for each of the 6 modules
-  int _institutionSubIndex = 0;
-  int _studentSubIndex = 0;
-  int _continuitySubIndex = 0;
-  int _financeSubIndex = 0;
-  int _websiteSubIndex = 0;
-  int _securitySubIndex = 0;
+  int _currentSubIndex = 0;
 
   // ==================== CONTROLLERS & FORM STATES ====================
   // Manual Student Form
@@ -253,27 +246,87 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
     final setting = provider.setting;
 
     return AdaptivePortalScaffold(
+      portalId: 'admin_console',
       portalTitle: 'Admin Command Center',
       portalSubtitle: setting.institutionName,
       initialIndex: _currentModuleIndex,
-      onTabChanged: (idx) => setState(() => _currentModuleIndex = idx),
+      initialSubIndex: _currentSubIndex,
+      defaultPinnedTabIds: const ['inst_overview', 'stud_manage', 'fin_settings', 'web_notices'],
+      onTabChanged: (idx) => setState(() {
+        _currentModuleIndex = idx;
+        _currentSubIndex = 0;
+      }),
+      onSubTabChanged: (mIdx, sIdx) => setState(() {
+        _currentModuleIndex = mIdx;
+        _currentSubIndex = sIdx;
+      }),
       tabs: [
-        // MODULE 1: INSTITUTION & STAFF
+        // MODULE 1: INSTITUTION SETTINGS
         PortalTabItem(
           id: 'institution',
-          label: 'Institution',
+          label: 'Institution Settings',
           icon: Icons.apartment_rounded,
           badge: '${provider.totalStaff} Staff',
-          body: _buildInstitutionModule(provider, setting),
+          subItems: [
+            PortalSubItem(
+              id: 'inst_overview',
+              label: 'Overview & Profile',
+              icon: Icons.dashboard_rounded,
+              body: _buildOverviewTab(provider, setting),
+            ),
+            PortalSubItem(
+              id: 'inst_academic_years',
+              label: 'Academic Years',
+              icon: Icons.calendar_month_rounded,
+              body: _buildAcademicYearsTab(provider, setting),
+            ),
+            PortalSubItem(
+              id: 'inst_staff',
+              label: 'Staff Directory',
+              icon: Icons.badge_rounded,
+              body: _buildStaffDirectoryTab(provider),
+            ),
+            PortalSubItem(
+              id: 'inst_add_staff',
+              label: 'Add Staff & Categories',
+              icon: Icons.person_add_alt_1_rounded,
+              body: _buildAddStaffTab(provider),
+            ),
+          ],
         ),
 
-        // MODULE 2: STUDENT MANAGEMENT & ROSTER
+        // MODULE 2: STUDENT ADMINISTRATION
         PortalTabItem(
           id: 'students',
-          label: 'Students Roster',
+          label: 'Student Administration',
           icon: Icons.groups_rounded,
           badge: '${provider.totalActiveStudents} Active',
-          body: _buildStudentsModule(provider, setting),
+          subItems: [
+            PortalSubItem(
+              id: 'stud_manage',
+              label: 'Manage Students',
+              icon: Icons.people_outline_rounded,
+              body: _buildManageStudentsTab(provider),
+            ),
+            PortalSubItem(
+              id: 'stud_manual',
+              label: 'Add Student (Manual)',
+              icon: Icons.person_add_rounded,
+              body: _buildManualStudentTab(provider),
+            ),
+            PortalSubItem(
+              id: 'stud_bulk',
+              label: 'Bulk Excel Upload',
+              icon: Icons.file_upload_rounded,
+              body: _buildBulkExcelTab(provider),
+            ),
+            PortalSubItem(
+              id: 'stud_classes',
+              label: 'Classes & Divisions',
+              icon: Icons.alt_route_rounded,
+              body: _buildClassesDivisionsTab(provider),
+            ),
+          ],
         ),
 
         // MODULE 3: CONTINUITY & TRANSFERS
@@ -282,7 +335,32 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
           label: 'Continuity & Transfers',
           icon: Icons.transfer_within_a_station_rounded,
           badge: '${provider.discontinuedStudents.length} Exit',
-          body: _buildContinuityModule(provider, setting),
+          subItems: [
+            PortalSubItem(
+              id: 'cont_discontinue',
+              label: 'Discontinue Student',
+              icon: Icons.person_remove_rounded,
+              body: _buildDiscontinueStudentTab(provider),
+            ),
+            PortalSubItem(
+              id: 'cont_departed',
+              label: 'Departed Directory',
+              icon: Icons.archive_rounded,
+              body: _buildDepartedDirectoryTab(provider),
+            ),
+            PortalSubItem(
+              id: 'cont_readmission',
+              label: 'Re-admission Wizard',
+              icon: Icons.restart_alt_rounded,
+              body: _buildReadmissionTab(provider),
+            ),
+            PortalSubItem(
+              id: 'cont_timeline',
+              label: 'Continuity Timeline',
+              icon: Icons.timeline_rounded,
+              body: _buildContinuityTimelineTab(provider),
+            ),
+          ],
         ),
 
         // MODULE 4: FINANCE & FEES
@@ -291,16 +369,60 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
           label: 'Finance & Fees',
           icon: Icons.payments_rounded,
           badge: '${setting.currencySymbol}${setting.defaultMonthlyFee.toStringAsFixed(0)}',
-          body: _buildFinanceModule(provider, setting),
+          subItems: [
+            PortalSubItem(
+              id: 'fin_settings',
+              label: 'Fee Settings & Windows',
+              icon: Icons.settings_suggest_rounded,
+              body: _buildFeeSettingsTab(provider, setting),
+            ),
+            PortalSubItem(
+              id: 'fin_builder',
+              label: 'Advanced Fee Builder',
+              icon: Icons.construction_rounded,
+              body: _buildAdvancedFeeBuilderTab(provider),
+            ),
+            PortalSubItem(
+              id: 'fin_siblings',
+              label: 'Sibling Groups',
+              icon: Icons.family_restroom_rounded,
+              body: _buildSiblingGroupsTab(provider),
+            ),
+            PortalSubItem(
+              id: 'fin_concessions',
+              label: 'Fee Concessions',
+              icon: Icons.percent_rounded,
+              body: _buildFeeConcessionsTab(provider),
+            ),
+          ],
         ),
 
-        // MODULE 5: WEBSITE & MEDIA
+        // MODULE 5: WEBSITE MANAGEMENT
         PortalTabItem(
           id: 'website',
           label: 'Website & Media',
           icon: Icons.public_rounded,
           badge: '${provider.notices.length} Notices',
-          body: _buildWebsiteModule(provider, setting),
+          subItems: [
+            PortalSubItem(
+              id: 'web_basic',
+              label: 'Basic Info & Social',
+              icon: Icons.info_outline_rounded,
+              body: _buildBasicInfoTab(provider, setting),
+            ),
+            PortalSubItem(
+              id: 'web_notices',
+              label: 'Notice Board',
+              icon: Icons.campaign_rounded,
+              body: _buildNoticeBoardTab(provider),
+            ),
+            PortalSubItem(
+              id: 'web_gallery',
+              label: 'Photo Gallery',
+              icon: Icons.photo_library_rounded,
+              body: _buildGalleryTab(provider),
+            ),
+          ],
         ),
 
         // MODULE 6: SYSTEM & SECURITY
@@ -309,98 +431,32 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
           label: 'System & Security',
           icon: Icons.security_rounded,
           badge: 'Super Admin',
-          body: _buildSecurityModule(provider, setting),
-        ),
-      ],
-    );
-  }
-
-  // ========================================================================
-  // SUBTAB PILL BAR COMPONENT
-  // ========================================================================
-  Widget _buildSubtabBar({
-    required List<String> labels,
-    required List<IconData> icons,
-    required int selectedIndex,
-    ValueChanged<int>? onSelected,
-    ValueChanged<int>? onTabChanged,
-  }) {
-    final callback = onTabChanged ?? onSelected ?? (_) {};
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: List.generate(labels.length, (idx) {
-            final isSelected = selectedIndex == idx;
-            return Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: InkWell(
-                onTap: () => callback(idx),
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isSelected ? const Color(0xFFEFF6FF) : Colors.transparent,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isSelected ? const Color(0xFF2563EB) : const Color(0xFFCBD5E1),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        icons[idx],
-                        size: 16,
-                        color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF64748B),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        labels[idx],
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                          color: isSelected ? const Color(0xFF1E40AF) : const Color(0xFF475569),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          }),
-        ),
-      ),
-    );
-  }
-
-  // ========================================================================
-  // MODULE 1: INSTITUTION & STAFF
-  // ========================================================================
-  Widget _buildInstitutionModule(InstitutionProvider provider, dynamic setting) {
-    return Column(
-      children: [
-        _buildSubtabBar(
-          labels: ['Overview', 'Academic Years', 'Staff Directory', 'Add Staff & Categories'],
-          icons: [Icons.dashboard_rounded, Icons.calendar_month_rounded, Icons.badge_rounded, Icons.person_add_alt_1_rounded],
-          selectedIndex: _institutionSubIndex,
-          onTabChanged: (i) => setState(() => _institutionSubIndex = i),
-        ),
-        Expanded(
-          child: IndexedStack(
-            index: _institutionSubIndex,
-            children: [
-              _buildOverviewTab(provider, setting),
-              _buildAcademicYearsTab(provider, setting),
-              _buildStaffDirectoryTab(provider),
-              _buildAddStaffTab(provider),
-            ],
-          ),
+          subItems: [
+            PortalSubItem(
+              id: 'sec_creds',
+              label: 'Master Credentials',
+              icon: Icons.vpn_key_rounded,
+              body: _buildCredentialsTab(provider, setting),
+            ),
+            PortalSubItem(
+              id: 'sec_session',
+              label: 'Session Monitor',
+              icon: Icons.devices_rounded,
+              body: _buildSessionMonitorTab(provider),
+            ),
+            PortalSubItem(
+              id: 'sec_backup',
+              label: 'Backup & Recovery',
+              icon: Icons.backup_rounded,
+              body: _buildBackupRecoveryTab(provider),
+            ),
+            PortalSubItem(
+              id: 'sec_audit',
+              label: 'System Audit Trail',
+              icon: Icons.history_rounded,
+              body: _buildAuditTrailTab(provider),
+            ),
+          ],
         ),
       ],
     );
@@ -484,12 +540,12 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                   spacing: 10,
                   runSpacing: 10,
                   children: [
-                    _buildQuickActionBtn('Add Student', Icons.person_add_rounded, const Color(0xFF2563EB), () => setState(() { _currentModuleIndex = 1; _studentSubIndex = 1; })),
-                    _buildQuickActionBtn('Manage Students', Icons.groups_rounded, const Color(0xFF7C3AED), () => setState(() { _currentModuleIndex = 1; _studentSubIndex = 0; })),
-                    _buildQuickActionBtn('Discontinue / Re-admit', Icons.transfer_within_a_station_rounded, const Color(0xFFE11D48), () => setState(() { _currentModuleIndex = 2; _continuitySubIndex = 0; })),
-                    _buildQuickActionBtn('Fee Windows & Alerts', Icons.receipt_rounded, const Color(0xFFD97706), () => setState(() { _currentModuleIndex = 3; _financeSubIndex = 0; })),
-                    _buildQuickActionBtn('Post Notice', Icons.campaign_rounded, const Color(0xFF059669), () => setState(() { _currentModuleIndex = 4; _websiteSubIndex = 1; })),
-                    _buildQuickActionBtn('Export Backup', Icons.download_rounded, const Color(0xFF475569), () => setState(() { _currentModuleIndex = 5; _securitySubIndex = 2; })),
+                    _buildQuickActionBtn('Add Student', Icons.person_add_rounded, const Color(0xFF2563EB), () => setState(() { _currentModuleIndex = 1; _currentSubIndex = 1; })),
+                    _buildQuickActionBtn('Manage Students', Icons.groups_rounded, const Color(0xFF7C3AED), () => setState(() { _currentModuleIndex = 1; _currentSubIndex = 0; })),
+                    _buildQuickActionBtn('Discontinue / Re-admit', Icons.transfer_within_a_station_rounded, const Color(0xFFE11D48), () => setState(() { _currentModuleIndex = 2; _currentSubIndex = 0; })),
+                    _buildQuickActionBtn('Fee Windows & Alerts', Icons.receipt_rounded, const Color(0xFFD97706), () => setState(() { _currentModuleIndex = 3; _currentSubIndex = 0; })),
+                    _buildQuickActionBtn('Post Notice', Icons.campaign_rounded, const Color(0xFF059669), () => setState(() { _currentModuleIndex = 4; _currentSubIndex = 1; })),
+                    _buildQuickActionBtn('Export Backup', Icons.download_rounded, const Color(0xFF475569), () => setState(() { _currentModuleIndex = 5; _currentSubIndex = 2; })),
                   ],
                 ),
               ],
@@ -649,7 +705,10 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
           children: [
             Text('Active Staff & Faculty (${provider.staffList.length})', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
             ElevatedButton.icon(
-              onPressed: () => setState(() => _institutionSubIndex = 3),
+              onPressed: () => setState(() {
+                _currentModuleIndex = 0;
+                _currentSubIndex = 3;
+              }),
               icon: const Icon(Icons.add, size: 16),
               label: const Text('Add Staff'),
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
@@ -868,7 +927,10 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                     );
                     await provider.addStaff(st);
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Staff ${st.name} registered successfully!')));
-                    setState(() => _institutionSubIndex = 2);
+                    setState(() {
+                      _currentModuleIndex = 0;
+                      _currentSubIndex = 2;
+                    });
                   },
                   icon: const Icon(Icons.person_add_rounded, size: 16),
                   label: const Text('Register Staff Member'),
@@ -883,33 +945,8 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
   }
 
   // ========================================================================
-  // MODULE 2: STUDENT MANAGEMENT & ROSTER
-  // ========================================================================
-  Widget _buildStudentsModule(InstitutionProvider provider, dynamic setting) {
-    return Column(
-      children: [
-        _buildSubtabBar(
-          labels: ['Manage Students', 'Add Student (Manual)', 'Bulk Excel Upload', 'Classes & Divisions'],
-          icons: [Icons.groups_rounded, Icons.person_add_alt_rounded, Icons.file_upload_rounded, Icons.class_rounded],
-          selectedIndex: _studentSubIndex,
-          onTabChanged: (i) => setState(() => _studentSubIndex = i),
-        ),
-        Expanded(
-          child: IndexedStack(
-            index: _studentSubIndex,
-            children: [
-              _buildManageStudentsTab(provider),
-              _buildManualStudentTab(provider),
-              _buildBulkExcelTab(provider),
-              _buildClassesDivisionsTab(provider),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
   // 2A. MANAGE STUDENTS
+  // ========================================================================
   Widget _buildManageStudentsTab(InstitutionProvider provider) {
     final query = _studentSearchCtrl.text.trim().toLowerCase();
     final filtered = provider.students.where((s) {
@@ -1210,7 +1247,10 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Student ${student.name} saved!')));
                     _stuNameCtrl.clear();
                     _stuAdmCtrl.clear();
-                    setState(() => _studentSubIndex = 0);
+                    setState(() {
+                      _currentModuleIndex = 1;
+                      _currentSubIndex = 0;
+                    });
                   }
                 },
                 icon: const Icon(Icons.save, size: 16),
@@ -1348,33 +1388,8 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
   }
 
   // ========================================================================
-  // MODULE 3: CONTINUITY & TRANSFERS
-  // ========================================================================
-  Widget _buildContinuityModule(InstitutionProvider provider, dynamic setting) {
-    return Column(
-      children: [
-        _buildSubtabBar(
-          labels: ['Discontinue Student', 'Departed Directory', 'Re-admission Wizard', 'Continuity Timeline'],
-          icons: [Icons.person_remove_rounded, Icons.archive_rounded, Icons.restart_alt_rounded, Icons.timeline_rounded],
-          selectedIndex: _continuitySubIndex,
-          onTabChanged: (i) => setState(() => _continuitySubIndex = i),
-        ),
-        Expanded(
-          child: IndexedStack(
-            index: _continuitySubIndex,
-            children: [
-              _buildDiscontinueStudentTab(provider),
-              _buildDepartedDirectoryTab(provider),
-              _buildReadmissionTab(provider),
-              _buildContinuityTimelineTab(provider),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
   // 3A. DISCONTINUE STUDENT
+  // ========================================================================
   Widget _buildDiscontinueStudentTab(InstitutionProvider provider) {
     final activeStudents = provider.activeStudents;
     final query = _discSearchCtrl.text.trim().toLowerCase();
@@ -1486,7 +1501,8 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${selectedStudent.name} discontinued and archived!')));
                       setState(() {
                         _selectedDiscStudentId = null;
-                        _continuitySubIndex = 1;
+                        _currentModuleIndex = 2;
+                        _currentSubIndex = 1;
                       });
                     },
                     icon: const Icon(Icons.person_remove_rounded, size: 16),
@@ -1637,31 +1653,9 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
   // ========================================================================
   // MODULE 4: FINANCE & FEES
   // ========================================================================
-  Widget _buildFinanceModule(InstitutionProvider provider, dynamic setting) {
-    return Column(
-      children: [
-        _buildSubtabBar(
-          labels: ['Fee Settings & Windows', 'Advanced Fee Builder', 'Sibling Groups', 'Fee Concessions'],
-          icons: [Icons.settings_suggest_rounded, Icons.construction_rounded, Icons.family_restroom_rounded, Icons.percent_rounded],
-          selectedIndex: _financeSubIndex,
-          onTabChanged: (i) => setState(() => _financeSubIndex = i),
-        ),
-        Expanded(
-          child: IndexedStack(
-            index: _financeSubIndex,
-            children: [
-              _buildFeeSettingsTab(provider, setting),
-              _buildAdvancedFeeBuilderTab(provider),
-              _buildSiblingGroupsTab(provider),
-              _buildFeeConcessionsTab(provider),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
+  // ========================================================================
   // 4A. FEE SETTINGS & WINDOWS
+  // ========================================================================
   Widget _buildFeeSettingsTab(InstitutionProvider provider, dynamic setting) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -2044,30 +2038,9 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
   // ========================================================================
   // MODULE 5: WEBSITE MANAGEMENT
   // ========================================================================
-  Widget _buildWebsiteModule(InstitutionProvider provider, dynamic setting) {
-    return Column(
-      children: [
-        _buildSubtabBar(
-          labels: ['Basic Info & Social', 'Notice Board', 'Photo Gallery'],
-          icons: [Icons.info_outline_rounded, Icons.campaign_rounded, Icons.photo_library_rounded],
-          selectedIndex: _websiteSubIndex,
-          onTabChanged: (i) => setState(() => _websiteSubIndex = i),
-        ),
-        Expanded(
-          child: IndexedStack(
-            index: _websiteSubIndex,
-            children: [
-              _buildBasicInfoTab(provider, setting),
-              _buildNoticeBoardTab(provider),
-              _buildGalleryTab(provider),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
+  // ========================================================================
   // 5A. BASIC INFO & SOCIAL
+  // ========================================================================
   Widget _buildBasicInfoTab(InstitutionProvider provider, dynamic setting) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -2332,31 +2305,9 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
   // ========================================================================
   // MODULE 6: SYSTEM & SECURITY
   // ========================================================================
-  Widget _buildSecurityModule(InstitutionProvider provider, dynamic setting) {
-    return Column(
-      children: [
-        _buildSubtabBar(
-          labels: ['Master Credentials', 'Session Monitor', 'Backup & Recovery', 'System Audit Trail'],
-          icons: [Icons.vpn_key_rounded, Icons.devices_rounded, Icons.backup_rounded, Icons.history_rounded],
-          selectedIndex: _securitySubIndex,
-          onTabChanged: (i) => setState(() => _securitySubIndex = i),
-        ),
-        Expanded(
-          child: IndexedStack(
-            index: _securitySubIndex,
-            children: [
-              _buildCredentialsTab(provider, setting),
-              _buildSessionMonitorTab(provider),
-              _buildBackupRecoveryTab(provider),
-              _buildAuditTrailTab(provider),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
+  // ========================================================================
   // 6A. MASTER CREDENTIALS
+  // ========================================================================
   Widget _buildCredentialsTab(InstitutionProvider provider, dynamic setting) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
