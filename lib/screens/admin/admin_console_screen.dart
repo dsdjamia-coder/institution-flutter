@@ -4295,7 +4295,7 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                   child: DropdownButtonFormField<String>(
                     value: _departedClassFilter ?? 'ALL',
                     decoration: const InputDecoration(labelText: 'Exit Class', border: OutlineInputBorder(), isDense: true),
-                    items: ['ALL', ...provider.classes].map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12.5)))).toList>,
+                    items: ['ALL', ...provider.classes].map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12.5)))).toList(),
                     onChanged: (v) => setState(() => _departedClassFilter = v),
                   ),
                 ),
@@ -4504,7 +4504,7 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                         child: DropdownButtonFormField<String>(
                           value: targetYear,
                           decoration: const InputDecoration(labelText: 'Target Academic Year *', border: OutlineInputBorder(), isDense: true),
-                          items: provider.academicYears.map((y) => DropdownMenuItem(value: y.name, child: Text(y.name, style: const TextStyle(fontSize: 12.5)))).toList(),
+                          items: provider.academicYears.map((y) => DropdownMenuItem(value: y.label, child: Text(y.label, style: const TextStyle(fontSize: 12.5)))).toList(),
                           onChanged: (v) => setDlg(() => targetYear = v ?? targetYear),
                         ),
                       ),
@@ -4670,7 +4670,8 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                     // Collect payment record
                     await provider.collectPayment(
                       Payment(
-                        id: '',
+                        id: 'pay_${DateTime.now().millisecondsSinceEpoch}',
+                        paymentId: 'pay_${DateTime.now().millisecondsSinceEpoch}',
                         receiptNo: int.tryParse(settleReceiptCtrl.text) ?? provider.nextReceiptNo,
                         studentId: s.id,
                         admissionNo: s.adm,
@@ -4679,11 +4680,18 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                         academicYear: targetYear,
                         amount: amt,
                         paymentMode: settlePaymentMode,
-                        collectedBy: provider.currentStaff?.name ?? 'Admin',
+                        collectedByName: provider.currentStaff?.name ?? 'Admin',
                         paymentDate: returnDateCtrl.text.trim(),
                         status: 'VALID',
-                        month: 'Re-admission Settlement',
-                        items: [FeeItem(name: 'Preserved Gap Dues Settlement', amount: amt, isDefaultMonthly: false)],
+                        feeItems: [
+                          FeeItemEntry(
+                            itemKey: 'READMIT_DUES_SETTLE',
+                            itemLabel: 'Preserved Gap Dues Settlement',
+                            amount: amt,
+                            period: 'Re-admission Settlement',
+                            ledgerKey: '${s.id}_${targetYear}_READMIT_DUES',
+                          ),
+                        ],
                       ),
                     );
                   }

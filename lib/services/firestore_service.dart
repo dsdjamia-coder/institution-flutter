@@ -503,7 +503,12 @@ class FirestoreService {
 
   Future<bool> saveGalleryItem(GalleryItem item) async {
     final docId = item.id.isEmpty ? 'gal_${DateTime.now().millisecondsSinceEpoch}' : item.id;
-    final updated = GalleryItem(id: docId, imageUrl: item.imageUrl, displayOrder: item.displayOrder);
+    final updated = GalleryItem(
+      id: docId,
+      imageUrl: item.imageUrl,
+      title: item.title,
+      displayOrder: item.displayOrder,
+    );
     final idx = _cachedGallery.indexWhere((g) => g.id == docId);
     if (idx != -1) {
       _cachedGallery[idx] = updated;

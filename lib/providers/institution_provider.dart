@@ -279,6 +279,10 @@ class InstitutionProvider extends ChangeNotifier {
     await addAuditLog('website', 'SAVE_GALLERY', 'Gallery photo saved');
   }
 
+  Future<void> addGalleryItem(GalleryItem item) async {
+    await saveGalleryItem(item);
+  }
+
   Future<void> deleteGalleryItem(String id) async {
     await _firestoreService.deleteGalleryItem(id);
     _gallery = await _firestoreService.fetchGallery();
