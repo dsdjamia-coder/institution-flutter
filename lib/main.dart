@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/institution_provider.dart';
-import 'screens/public/public_screen.dart';
+import 'core/theme/app_theme.dart';
+import 'core/routing/app_router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,33 +25,16 @@ class InstitutionManagementApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final setting = context.watch<InstitutionProvider>().setting;
+    final provider = context.watch<InstitutionProvider>();
+    final setting = provider.setting;
 
-    return MaterialApp(
+    return MaterialApp.router(
       title: setting.appName,
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF2563EB),
-          primary: const Color(0xFF2563EB),
-          surface: Colors.white,
-        ),
-        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
-        cardTheme: CardTheme(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-            side: BorderSide(color: Colors.grey.shade200),
-          ),
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.white,
-          foregroundColor: Color(0xFF0F172A),
-          elevation: 0,
-        ),
-      ),
-      home: const PublicScreen(),
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: provider.themeMode,
+      routerConfig: AppRouter.router,
     );
   }
 }

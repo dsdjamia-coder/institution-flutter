@@ -333,6 +333,16 @@ class _AdaptivePortalScaffoldState extends State<AdaptivePortalScaffold> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    IconButton(
+                      tooltip: provider.isDarkMode ? 'Light Mode' : 'Dark Mode',
+                      icon: Icon(
+                        provider.isDarkMode ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+                        size: 20,
+                        color: provider.isDarkMode ? Colors.amber : const Color(0xFF64748B),
+                      ),
+                      onPressed: () => provider.toggleTheme(),
+                    ),
+                    const SizedBox(width: 4),
                     if (widget.headerActions != null) ...widget.headerActions!,
                     const SizedBox(width: 8),
                     OutlinedButton.icon(
@@ -641,6 +651,15 @@ class _AdaptivePortalScaffoldState extends State<AdaptivePortalScaffold> {
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: provider.isDarkMode ? 'Light Mode' : 'Dark Mode',
+            icon: Icon(
+              provider.isDarkMode ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+              size: 20,
+              color: provider.isDarkMode ? Colors.amber : const Color(0xFF64748B),
+            ),
+            onPressed: () => provider.toggleTheme(),
+          ),
           if (widget.headerActions != null) ...widget.headerActions!,
         ],
       ),

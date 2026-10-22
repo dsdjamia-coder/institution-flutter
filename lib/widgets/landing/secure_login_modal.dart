@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import '../../providers/institution_provider.dart';
 import '../../models/student.dart';
+import '../../core/routing/app_router.dart';
 import '../../screens/student/student_portal_screen.dart';
 import '../../screens/official/official_hub_screen.dart';
 
@@ -114,10 +116,7 @@ class _SecureLoginModalState extends State<SecureLoginModal> {
         provider.loginStudent(student);
         if (mounted) {
           Navigator.pop(context);
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const StudentPortalScreen()),
-          );
+          context.push(AppRouter.student);
         }
       } else {
         // ==================== STAFF / ADMIN LOGIN ====================
@@ -135,10 +134,7 @@ class _SecureLoginModalState extends State<SecureLoginModal> {
         final success = await provider.loginStaff(identifier, password);
         if (success && mounted) {
           Navigator.pop(context);
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const OfficialHubScreen()),
-          );
+          context.push(AppRouter.hub);
         } else {
           setState(() {
             _errorMessage = 'Invalid credentials. Please verify your login.';

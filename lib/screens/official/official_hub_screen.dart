@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import '../../providers/institution_provider.dart';
+import '../../core/routing/app_router.dart';
 import '../collection/fee_collection_screen.dart';
 import '../worksheet/worksheet_screen.dart';
 import '../results/result_management_screen.dart';
@@ -121,12 +123,7 @@ class OfficialHubScreen extends StatelessWidget {
                       icon: Icons.receipt_long,
                       color: Colors.teal,
                       hasAccess: staff?.hasCollectionAccess ?? true,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const FeeCollectionScreen()),
-                        );
-                      },
+                      onTap: () => context.push(AppRouter.collection),
                     ),
                     _buildModuleTile(
                       context,
@@ -135,12 +132,7 @@ class OfficialHubScreen extends StatelessWidget {
                       icon: Icons.grade,
                       color: Colors.indigo,
                       hasAccess: staff?.hasResultAccess ?? true,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const ResultManagementScreen()),
-                        );
-                      },
+                      onTap: () => context.push(AppRouter.results),
                     ),
                     _buildModuleTile(
                       context,
@@ -149,12 +141,7 @@ class OfficialHubScreen extends StatelessWidget {
                       icon: Icons.table_chart,
                       color: Colors.amber.shade800,
                       hasAccess: staff?.hasWorksheetAccess ?? true,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const WorksheetScreen()),
-                        );
-                      },
+                      onTap: () => context.push(AppRouter.worksheet),
                     ),
                     _buildModuleTile(
                       context,
@@ -163,12 +150,7 @@ class OfficialHubScreen extends StatelessWidget {
                       icon: Icons.admin_panel_settings,
                       color: Colors.red,
                       hasAccess: staff?.hasAdminAccess ?? true,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const AdminConsoleScreen()),
-                        );
-                      },
+                      onTap: () => context.push(AppRouter.admin),
                     ),
                   ],
                 );
