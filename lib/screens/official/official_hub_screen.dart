@@ -276,7 +276,7 @@ class OfficialHubScreen extends StatelessWidget {
     final currencySymbol = provider.setting.currencySymbol;
     final totalStudents = provider.students.length;
     final totalStaff = provider.staffList.length;
-    final activeYear = provider.activeAcademicYear?.name ?? provider.setting.activeAcademicYear;
+    final activeYear = provider.setting.activeAcademicYear;
     final todayCollection = provider.todayCollection;
 
     final cards = [

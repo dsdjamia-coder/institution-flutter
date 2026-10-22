@@ -463,7 +463,7 @@ class _WorksheetScreenState extends State<WorksheetScreen> {
                   DataCell(Text(s.adm, style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold))),
                   DataCell(Text(s.name, style: const TextStyle(fontWeight: FontWeight.w600))),
                   DataCell(Text(s.studentClass)),
-                  DataCell(Text(s.roll.isNotEmpty ? s.roll : '-')),
+                  DataCell(Text(s.roll > 0 ? s.roll.toString() : '-')),
                   DataCell(Text(s.gender)),
                   DataCell(Text(s.father.isNotEmpty ? s.father : '-')),
                   DataCell(Text(s.mobile.isNotEmpty ? s.mobile : '-')),

@@ -598,7 +598,7 @@ class _ResultManagementScreenState extends State<ResultManagementScreen> {
                   children: [
                     Text(st.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5)),
                     Text(
-                      'Roll: ${st.roll.isNotEmpty ? st.roll : "-"} • ${st.gender}',
+                      'Roll: ${st.roll > 0 ? st.roll : "-"} • ${st.gender}',
                       style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
                     ),
                   ],

@@ -406,7 +406,7 @@ class _FeeCollectionScreenState extends State<FeeCollectionScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Adm: #${s.adm} • Class: ${s.studentClass} • Roll: ${s.roll.isNotEmpty ? s.roll : "-"}',
+                      'Adm: #${s.adm} • Class: ${s.studentClass} • Roll: ${s.roll > 0 ? s.roll : "-"}',
                       style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
                     ),
                   ],
@@ -942,7 +942,7 @@ class _FeeCollectionScreenState extends State<FeeCollectionScreen> {
     final filteredPayments = provider.payments.where((p) {
       final matchesQuery = _historySearchQuery.isEmpty ||
           p.studentName.toLowerCase().contains(_historySearchQuery.toLowerCase()) ||
-          p.receiptNo.contains(_historySearchQuery) ||
+          p.receiptNo.toString().contains(_historySearchQuery) ||
           p.admissionNo.contains(_historySearchQuery);
       final matchesStatus = _historyStatusFilter == 'ALL' || p.status == _historyStatusFilter;
       return matchesQuery && matchesStatus;

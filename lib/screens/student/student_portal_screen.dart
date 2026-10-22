@@ -254,7 +254,7 @@ class _StudentPortalScreenState extends State<StudentPortalScreen> {
                       )
                     else ...[
                       _buildIdField('Class Cohort', student.studentClass),
-                      if (student.roll.isNotEmpty) _buildIdField('Roll Number', student.roll),
+                      if (student.roll > 0) _buildIdField('Roll Number', student.roll.toString()),
                     ],
                     if (student.father.isNotEmpty) _buildIdField('Guardian / Father', student.father),
                     if (student.mobile.isNotEmpty) _buildIdField('Contact Number', student.mobile),
@@ -598,7 +598,7 @@ class _StudentPortalScreenState extends State<StudentPortalScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(n.headline, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                  Text(n.heading, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
                   Text(n.date, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
                 ],
               ),

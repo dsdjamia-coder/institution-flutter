@@ -14,6 +14,7 @@ import '../theme/app_colors.dart';
 class AppRouter {
   // Named Route Constants
   static const String home = '/';
+  static const String public = '/';
   static const String hub = '/hub';
   static const String admin = '/admin';
   static const String collection = '/collection';

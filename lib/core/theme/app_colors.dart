@@ -66,9 +66,25 @@ class AppColors {
   static const Color lightTextMuted = Color(0xFF94A3B8);
 
   // Modern SaaS Elevations & Shadows
-  static const Color cardShadow = Color(0x0A0F172A); // Soft 4% slate shadow
-  static const Color cardHoverShadow = Color(0x140F172A); // Elevated 8% slate shadow
+  static const Color cardShadowColor = Color(0x0A0F172A); // Soft 4% slate shadow
+  static const Color cardHoverShadowColor = Color(0x140F172A); // Elevated 8% slate shadow
   static const Color accentGlow = Color(0x1F2563EB); // Subtle brand glow
+
+  static const List<BoxShadow> cardShadow = [
+    BoxShadow(
+      color: Color(0x0A0F172A),
+      blurRadius: 16,
+      offset: Offset(0, 4),
+    ),
+  ];
+
+  static const List<BoxShadow> cardHoverShadow = [
+    BoxShadow(
+      color: Color(0x140F172A),
+      blurRadius: 24,
+      offset: Offset(0, 8),
+    ),
+  ];
 
   // Modern Micro-Gradients
   static const LinearGradient primaryGradient = LinearGradient(
