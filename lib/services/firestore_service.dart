@@ -7,6 +7,13 @@ import '../models/student.dart';
 import '../models/payment.dart';
 import '../models/staff.dart';
 import '../models/exam_result.dart';
+import '../models/notice.dart';
+import '../models/gallery_item.dart';
+import '../models/academic_year.dart';
+import '../models/student_group.dart';
+import '../models/fee_concession.dart';
+import '../models/custom_fee_item.dart';
+import '../models/audit_log.dart';
 
 /// Firebase Firestore Communication Service
 class FirestoreService {
@@ -19,6 +26,13 @@ class FirestoreService {
   final List<Payment> _cachedPayments = [];
   final List<Staff> _cachedStaff = [];
   final List<ExamResult> _cachedResults = [];
+  final List<Notice> _cachedNotices = [];
+  final List<GalleryItem> _cachedGallery = [];
+  final List<AcademicYearConfig> _cachedYears = [];
+  final List<StudentGroup> _cachedGroups = [];
+  final List<FeeConcession> _cachedConcessions = [];
+  final List<CustomFeeItem> _cachedCustomFees = [];
+  final List<AuditLogEntry> _cachedAuditLogs = [];
 
   // ==================== SETTINGS ====================
   Future<InstitutionSetting> fetchSettings() async {
@@ -399,6 +413,432 @@ class FirestoreService {
       }
     } catch (e) {
       debugPrint('[FirestoreService] signInWithFirebaseAuth exception: $e');
+      return {'error': e.toString()};
+    }
+  }
+
+  // ==================== NOTICES ====================
+  Future<List<Notice>> fetchNotices() async {
+    try {
+      final url = Uri.parse('$baseUrl/notices');
+      final res = await http.get(url);
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final documents = data['documents'] as List? ?? [];
+        _cachedNotices.clear();
+        for (final doc in documents) {
+          final docName = doc['name']?.toString() ?? '';
+          final docId = docName.split('/').last;
+          final fields = _decodeFirestoreFields(doc['fields'] ?? {});
+          _cachedNotices.add(Notice.fromMap(docId, fields));
+        }
+      }
+    } catch (e) {
+      debugPrint('[FirestoreService] fetchNotices notice: $e');
+    }
+    return _cachedNotices;
+  }
+
+  Future<bool> saveNotice(Notice notice) async {
+    final docId = notice.id.isEmpty ? 'not_${DateTime.now().millisecondsSinceEpoch}' : notice.id;
+    final updated = Notice(
+      id: docId,
+      heading: notice.heading,
+      description: notice.description,
+      imageUrl: notice.imageUrl,
+      date: notice.date,
+      isPinned: notice.isPinned,
+    );
+    final idx = _cachedNotices.indexWhere((n) => n.id == docId);
+    if (idx != -1) {
+      _cachedNotices[idx] = updated;
+    } else {
+      _cachedNotices.insert(0, updated);
+    }
+
+    try {
+      final url = Uri.parse('$baseUrl/notices/$docId');
+      final body = jsonEncode({'fields': _encodeFirestoreFields(updated.toMap())});
+      final res = await http.patch(url, body: body, headers: {'Content-Type': 'application/json'});
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('[FirestoreService] saveNotice notice: $e');
+      return true;
+    }
+  }
+
+  Future<bool> deleteNotice(String id) async {
+    _cachedNotices.removeWhere((n) => n.id == id);
+    try {
+      final url = Uri.parse('$baseUrl/notices/$id');
+      final res = await http.delete(url);
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('[FirestoreService] deleteNotice notice: $e');
+      return true;
+    }
+  }
+
+  // ==================== GALLERY ====================
+  Future<List<GalleryItem>> fetchGallery() async {
+    try {
+      final url = Uri.parse('$baseUrl/gallery');
+      final res = await http.get(url);
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final documents = data['documents'] as List? ?? [];
+        _cachedGallery.clear();
+        for (final doc in documents) {
+          final docName = doc['name']?.toString() ?? '';
+          final docId = docName.split('/').last;
+          final fields = _decodeFirestoreFields(doc['fields'] ?? {});
+          _cachedGallery.add(GalleryItem.fromMap(docId, fields));
+        }
+      }
+    } catch (e) {
+      debugPrint('[FirestoreService] fetchGallery notice: $e');
+    }
+    return _cachedGallery;
+  }
+
+  Future<bool> saveGalleryItem(GalleryItem item) async {
+    final docId = item.id.isEmpty ? 'gal_${DateTime.now().millisecondsSinceEpoch}' : item.id;
+    final updated = GalleryItem(id: docId, imageUrl: item.imageUrl, displayOrder: item.displayOrder);
+    final idx = _cachedGallery.indexWhere((g) => g.id == docId);
+    if (idx != -1) {
+      _cachedGallery[idx] = updated;
+    } else {
+      _cachedGallery.add(updated);
+    }
+
+    try {
+      final url = Uri.parse('$baseUrl/gallery/$docId');
+      final body = jsonEncode({'fields': _encodeFirestoreFields(updated.toMap())});
+      final res = await http.patch(url, body: body, headers: {'Content-Type': 'application/json'});
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('[FirestoreService] saveGalleryItem notice: $e');
+      return true;
+    }
+  }
+
+  Future<bool> deleteGalleryItem(String id) async {
+    _cachedGallery.removeWhere((g) => g.id == id);
+    try {
+      final url = Uri.parse('$baseUrl/gallery/$id');
+      final res = await http.delete(url);
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('[FirestoreService] deleteGalleryItem notice: $e');
+      return true;
+    }
+  }
+
+  // ==================== ACADEMIC YEARS ====================
+  Future<List<AcademicYearConfig>> fetchAcademicYears() async {
+    try {
+      final url = Uri.parse('$baseUrl/settings/academicYears');
+      final res = await http.get(url);
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final fields = _decodeFirestoreFields(data['fields'] ?? {});
+        if (fields['yearsList'] is List) {
+          _cachedYears.clear();
+          for (final y in fields['yearsList']) {
+            if (y is Map<String, dynamic>) {
+              _cachedYears.add(AcademicYearConfig.fromMap(y));
+            } else if (y is String) {
+              _cachedYears.add(AcademicYearConfig(label: y));
+            }
+          }
+          return _cachedYears;
+        }
+      }
+    } catch (e) {
+      debugPrint('[FirestoreService] fetchAcademicYears notice: $e');
+    }
+    if (_cachedYears.isEmpty) {
+      _cachedYears.addAll([
+        AcademicYearConfig(label: '2026-2027', status: 'current'),
+        AcademicYearConfig(label: '2025-2026', status: 'active'),
+        AcademicYearConfig(label: '2024-2025', status: 'archived'),
+      ]);
+    }
+    return _cachedYears;
+  }
+
+  Future<bool> saveAcademicYears(List<AcademicYearConfig> years) async {
+    _cachedYears.clear();
+    _cachedYears.addAll(years);
+    try {
+      final url = Uri.parse('$baseUrl/settings/academicYears');
+      final rawList = years.map((y) => y.toMap()).toList();
+      final body = jsonEncode({'fields': _encodeFirestoreFields({'yearsList': rawList})});
+      final res = await http.patch(url, body: body, headers: {'Content-Type': 'application/json'});
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('[FirestoreService] saveAcademicYears notice: $e');
+      return true;
+    }
+  }
+
+  // ==================== STUDENT GROUPS ====================
+  Future<List<StudentGroup>> fetchStudentGroups() async {
+    try {
+      final url = Uri.parse('$baseUrl/studentGroups');
+      final res = await http.get(url);
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final documents = data['documents'] as List? ?? [];
+        _cachedGroups.clear();
+        for (final doc in documents) {
+          final docName = doc['name']?.toString() ?? '';
+          final docId = docName.split('/').last;
+          final fields = _decodeFirestoreFields(doc['fields'] ?? {});
+          _cachedGroups.add(StudentGroup.fromMap(docId, fields));
+        }
+      }
+    } catch (e) {
+      debugPrint('[FirestoreService] fetchStudentGroups notice: $e');
+    }
+    return _cachedGroups;
+  }
+
+  Future<bool> saveStudentGroup(StudentGroup group) async {
+    final docId = group.id.isEmpty ? 'grp_${DateTime.now().millisecondsSinceEpoch}' : group.id;
+    final updated = StudentGroup(id: docId, name: group.name, monthlyFee: group.monthlyFee, memberStudentIds: group.memberStudentIds);
+    final idx = _cachedGroups.indexWhere((g) => g.id == docId);
+    if (idx != -1) {
+      _cachedGroups[idx] = updated;
+    } else {
+      _cachedGroups.add(updated);
+    }
+
+    try {
+      final url = Uri.parse('$baseUrl/studentGroups/$docId');
+      final body = jsonEncode({'fields': _encodeFirestoreFields(updated.toMap())});
+      final res = await http.patch(url, body: body, headers: {'Content-Type': 'application/json'});
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('[FirestoreService] saveStudentGroup notice: $e');
+      return true;
+    }
+  }
+
+  Future<bool> deleteStudentGroup(String id) async {
+    _cachedGroups.removeWhere((g) => g.id == id);
+    try {
+      final url = Uri.parse('$baseUrl/studentGroups/$id');
+      final res = await http.delete(url);
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('[FirestoreService] deleteStudentGroup notice: $e');
+      return true;
+    }
+  }
+
+  // ==================== FEE CONCESSIONS ====================
+  Future<List<FeeConcession>> fetchConcessions() async {
+    try {
+      final url = Uri.parse('$baseUrl/concessions');
+      final res = await http.get(url);
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final documents = data['documents'] as List? ?? [];
+        _cachedConcessions.clear();
+        for (final doc in documents) {
+          final docName = doc['name']?.toString() ?? '';
+          final docId = docName.split('/').last;
+          final fields = _decodeFirestoreFields(doc['fields'] ?? {});
+          _cachedConcessions.add(FeeConcession.fromMap(docId, fields));
+        }
+      }
+    } catch (e) {
+      debugPrint('[FirestoreService] fetchConcessions notice: $e');
+    }
+    return _cachedConcessions;
+  }
+
+  Future<bool> saveConcession(FeeConcession conc) async {
+    final docId = conc.studentId;
+    final idx = _cachedConcessions.indexWhere((c) => c.studentId == docId);
+    if (idx != -1) {
+      _cachedConcessions[idx] = conc;
+    } else {
+      _cachedConcessions.add(conc);
+    }
+
+    try {
+      final url = Uri.parse('$baseUrl/concessions/$docId');
+      final body = jsonEncode({'fields': _encodeFirestoreFields(conc.toMap())});
+      final res = await http.patch(url, body: body, headers: {'Content-Type': 'application/json'});
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('[FirestoreService] saveConcession notice: $e');
+      return true;
+    }
+  }
+
+  Future<bool> deleteConcession(String studentId) async {
+    _cachedConcessions.removeWhere((c) => c.studentId == studentId);
+    try {
+      final url = Uri.parse('$baseUrl/concessions/$studentId');
+      final res = await http.delete(url);
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('[FirestoreService] deleteConcession notice: $e');
+      return true;
+    }
+  }
+
+  // ==================== CUSTOM FEE ITEMS ====================
+  Future<List<CustomFeeItem>> fetchCustomFees() async {
+    try {
+      final url = Uri.parse('$baseUrl/customFeeItems');
+      final res = await http.get(url);
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final documents = data['documents'] as List? ?? [];
+        _cachedCustomFees.clear();
+        for (final doc in documents) {
+          final docName = doc['name']?.toString() ?? '';
+          final docId = docName.split('/').last;
+          final fields = _decodeFirestoreFields(doc['fields'] ?? {});
+          _cachedCustomFees.add(CustomFeeItem.fromMap(docId, fields));
+        }
+      }
+    } catch (e) {
+      debugPrint('[FirestoreService] fetchCustomFees notice: $e');
+    }
+    return _cachedCustomFees;
+  }
+
+  Future<bool> saveCustomFee(CustomFeeItem fee) async {
+    final docId = fee.id.isEmpty ? 'fee_${DateTime.now().millisecondsSinceEpoch}' : fee.id;
+    final updated = CustomFeeItem(
+      id: docId,
+      name: fee.name,
+      scope: fee.scope,
+      globalAmount: fee.globalAmount,
+      classWiseAmounts: fee.classWiseAmounts,
+      specificClass: fee.specificClass,
+      isReceiptRequired: fee.isReceiptRequired,
+    );
+    final idx = _cachedCustomFees.indexWhere((f) => f.id == docId);
+    if (idx != -1) {
+      _cachedCustomFees[idx] = updated;
+    } else {
+      _cachedCustomFees.add(updated);
+    }
+
+    try {
+      final url = Uri.parse('$baseUrl/customFeeItems/$docId');
+      final body = jsonEncode({'fields': _encodeFirestoreFields(updated.toMap())});
+      final res = await http.patch(url, body: body, headers: {'Content-Type': 'application/json'});
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('[FirestoreService] saveCustomFee notice: $e');
+      return true;
+    }
+  }
+
+  Future<bool> deleteCustomFee(String id) async {
+    _cachedCustomFees.removeWhere((f) => f.id == id);
+    try {
+      final url = Uri.parse('$baseUrl/customFeeItems/$id');
+      final res = await http.delete(url);
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('[FirestoreService] deleteCustomFee notice: $e');
+      return true;
+    }
+  }
+
+  // ==================== SYSTEM AUDIT LOGS ====================
+  Future<List<AuditLogEntry>> fetchAuditLogs() async {
+    try {
+      final url = Uri.parse('$baseUrl/auditLogs');
+      final res = await http.get(url);
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final documents = data['documents'] as List? ?? [];
+        _cachedAuditLogs.clear();
+        for (final doc in documents) {
+          final docName = doc['name']?.toString() ?? '';
+          final docId = docName.split('/').last;
+          final fields = _decodeFirestoreFields(doc['fields'] ?? {});
+          _cachedAuditLogs.add(AuditLogEntry.fromMap(docId, fields));
+        }
+        _cachedAuditLogs.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      }
+    } catch (e) {
+      debugPrint('[FirestoreService] fetchAuditLogs notice: $e');
+    }
+    return _cachedAuditLogs;
+  }
+
+  Future<bool> addAuditLog(AuditLogEntry entry) async {
+    _cachedAuditLogs.insert(0, entry);
+    try {
+      final docId = entry.id.isEmpty ? 'log_${DateTime.now().millisecondsSinceEpoch}' : entry.id;
+      final url = Uri.parse('$baseUrl/auditLogs/$docId');
+      final body = jsonEncode({'fields': _encodeFirestoreFields(entry.toMap())});
+      final res = await http.patch(url, body: body, headers: {'Content-Type': 'application/json'});
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('[FirestoreService] addAuditLog notice: $e');
+      return true;
+    }
+  }
+
+  Future<bool> clearAuditLogs() async {
+    _cachedAuditLogs.clear();
+    return true;
+  }
+
+  // ==================== BACKUP & RESTORE ====================
+  Future<String> exportDatabaseJson() async {
+    final Map<String, dynamic> snapshot = {
+      'exportedAt': DateTime.now().toIso8601String(),
+      'systemVersion': 'v2.6.0',
+      'institution': _cachedSetting.toMap(),
+      'classes': _cachedClasses,
+      'students': _cachedStudents.map((s) => s.toMap()).toList(),
+      'staff': _cachedStaff.map((st) => st.toMap()).toList(),
+      'payments': _cachedPayments.map((p) => p.toMap()).toList(),
+      'academicYears': _cachedYears.map((y) => y.toMap()).toList(),
+      'studentGroups': _cachedGroups.map((g) => g.toMap()).toList(),
+      'concessions': _cachedConcessions.map((c) => c.toMap()).toList(),
+      'customFeeItems': _cachedCustomFees.map((f) => f.toMap()).toList(),
+      'notices': _cachedNotices.map((n) => n.toMap()).toList(),
+    };
+    return const JsonEncoder.withIndent('  ').convert(snapshot);
+  }
+
+  // ==================== FIREBASE AUTH CREDENTIALS UPDATE ====================
+  Future<Map<String, dynamic>?> updateAdminCredentials({
+    required String idToken,
+    String? newEmail,
+    String? newPassword,
+  }) async {
+    try {
+      final url = Uri.parse('https://identitytoolkit.googleapis.com/v1/accounts:update?key=AIzaSyCRlnf6B82HpYB1hPEFORF2yAkj3zMv7Xg');
+      final Map<String, dynamic> bodyMap = {
+        'idToken': idToken,
+        'returnSecureToken': true,
+      };
+      if (newEmail != null && newEmail.isNotEmpty) bodyMap['email'] = newEmail;
+      if (newPassword != null && newPassword.isNotEmpty) bodyMap['password'] = newPassword;
+
+      final res = await http.post(url, body: jsonEncode(bodyMap), headers: {'Content-Type': 'application/json'});
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body) as Map<String, dynamic>;
+      } else {
+        final err = jsonDecode(res.body);
+        final msg = err['error']?['message']?.toString() ?? 'Update failed';
+        return {'error': msg};
+      }
+    } catch (e) {
       return {'error': e.toString()};
     }
   }

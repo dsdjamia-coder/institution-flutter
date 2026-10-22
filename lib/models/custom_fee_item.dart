@@ -1,0 +1,50 @@
+class CustomFeeItem {
+  final String id;
+  final String name;
+  final String scope; // 'global', 'class-wise', 'specific'
+  final double globalAmount;
+  final Map<String, double> classWiseAmounts;
+  final String specificClass;
+  final bool isReceiptRequired;
+
+  CustomFeeItem({
+    required this.id,
+    required this.name,
+    this.scope = 'global',
+    this.globalAmount = 0.0,
+    this.classWiseAmounts = const {},
+    this.specificClass = '',
+    this.isReceiptRequired = false,
+  });
+
+  factory CustomFeeItem.fromMap(String id, Map<String, dynamic> map) {
+    Map<String, double> cw = {};
+    if (map['classWiseAmounts'] is Map) {
+      (map['classWiseAmounts'] as Map).forEach((k, v) {
+        cw[k.toString()] = double.tryParse(v.toString()) ?? 0.0;
+      });
+    }
+
+    return CustomFeeItem(
+      id: id,
+      name: map['name']?.toString() ?? '',
+      scope: map['scope']?.toString() ?? 'global',
+      globalAmount: double.tryParse(map['globalAmount']?.toString() ?? map['amount']?.toString() ?? '') ?? 0.0,
+      classWiseAmounts: cw,
+      specificClass: map['specificClass']?.toString() ?? '',
+      isReceiptRequired: map['isReceiptRequired'] == true || map['isReceiptRequired']?.toString() == 'true',
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'scope': scope,
+      'globalAmount': globalAmount,
+      'amount': globalAmount,
+      'classWiseAmounts': classWiseAmounts,
+      'specificClass': specificClass,
+      'isReceiptRequired': isReceiptRequired,
+    };
+  }
+}

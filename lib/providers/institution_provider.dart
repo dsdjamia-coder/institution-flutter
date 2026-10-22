@@ -4,6 +4,13 @@ import '../models/student.dart';
 import '../models/payment.dart';
 import '../models/staff.dart';
 import '../models/exam_result.dart';
+import '../models/notice.dart';
+import '../models/gallery_item.dart';
+import '../models/academic_year.dart';
+import '../models/student_group.dart';
+import '../models/fee_concession.dart';
+import '../models/custom_fee_item.dart';
+import '../models/audit_log.dart';
 import '../services/firestore_service.dart';
 import '../services/duplicate_guard.dart';
 
@@ -30,6 +37,27 @@ class InstitutionProvider extends ChangeNotifier {
 
   List<ExamResult> _examResults = [];
   List<ExamResult> get examResults => _examResults;
+
+  List<Notice> _notices = [];
+  List<Notice> get notices => _notices;
+
+  List<GalleryItem> _gallery = [];
+  List<GalleryItem> get gallery => _gallery;
+
+  List<AcademicYearConfig> _academicYears = [];
+  List<AcademicYearConfig> get academicYears => _academicYears;
+
+  List<StudentGroup> _studentGroups = [];
+  List<StudentGroup> get studentGroups => _studentGroups;
+
+  List<FeeConcession> _concessions = [];
+  List<FeeConcession> get concessions => _concessions;
+
+  List<CustomFeeItem> _customFeeItems = [];
+  List<CustomFeeItem> get customFeeItems => _customFeeItems;
+
+  List<AuditLogEntry> _auditLogs = [];
+  List<AuditLogEntry> get auditLogs => _auditLogs;
 
   // Active User Sessions
   String? _currentRole;
@@ -93,6 +121,13 @@ class InstitutionProvider extends ChangeNotifier {
       _students = await _firestoreService.fetchStudents();
       _payments = await _firestoreService.fetchPayments();
       _staffList = await _firestoreService.fetchStaff();
+      _notices = await _firestoreService.fetchNotices();
+      _gallery = await _firestoreService.fetchGallery();
+      _academicYears = await _firestoreService.fetchAcademicYears();
+      _studentGroups = await _firestoreService.fetchStudentGroups();
+      _concessions = await _firestoreService.fetchConcessions();
+      _customFeeItems = await _firestoreService.fetchCustomFees();
+      _auditLogs = await _firestoreService.fetchAuditLogs();
 
       if (_classes.isEmpty) {
         // Derive classes dynamically from students in Firestore
@@ -149,6 +184,235 @@ class InstitutionProvider extends ChangeNotifier {
     _classes.remove(className);
     notifyListeners();
     await _firestoreService.saveClasses(_classes);
+  }
+
+  Future<void> generateDefaultClasses() async {
+    _classes = [
+      'Class 1', 'Class 2', 'Class 3', 'Class 4',
+      'Class 5', 'Class 6', 'Class 7', 'Class 8',
+      'Class 9', 'Class 10', 'Class 11', 'Class 12',
+    ];
+    notifyListeners();
+    await _firestoreService.saveClasses(_classes);
+    await addAuditLog('class', 'GENERATE_CLASSES', 'Generated default classes 1 through 12');
+  }
+
+  Future<void> generateDivisions(String baseClass, int count) async {
+    final cleanBase = baseClass.trim();
+    if (cleanBase.isEmpty || count < 1) return;
+    final divisions = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
+    for (int i = 0; i < count && i < divisions.length; i++) {
+      final divName = '$cleanBase ${divisions[i]}';
+      if (!_classes.contains(divName)) {
+        _classes.add(divName);
+      }
+    }
+    _classes.sort();
+    notifyListeners();
+    await _firestoreService.saveClasses(_classes);
+    await addAuditLog('class', 'GENERATE_DIVISIONS', 'Generated $count divisions for $cleanBase');
+  }
+
+  Future<void> renameClass(String oldName, String newName) async {
+    final cleanOld = oldName.trim();
+    final cleanNew = newName.trim();
+    if (cleanNew.isEmpty || cleanOld == cleanNew) return;
+
+    final idx = _classes.indexOf(cleanOld);
+    if (idx != -1) {
+      _classes[idx] = cleanNew;
+      // Also update all students in that class
+      for (int i = 0; i < _students.length; i++) {
+        if (_students[i].studentClass == cleanOld) {
+          final updated = _students[i].copyWith(studentClass: cleanNew);
+          _students[i] = updated;
+          _firestoreService.saveStudent(updated);
+        }
+      }
+      notifyListeners();
+      await _firestoreService.saveClasses(_classes);
+      await addAuditLog('class', 'RENAME_CLASS', 'Renamed class $cleanOld to $cleanNew');
+    }
+  }
+
+  Future<void> moveStudentsToClass(List<String> studentIds, String targetClass) async {
+    final cleanTarget = targetClass.trim();
+    if (cleanTarget.isEmpty || studentIds.isEmpty) return;
+
+    for (final sid in studentIds) {
+      final idx = _students.indexWhere((s) => s.id == sid);
+      if (idx != -1) {
+        final updated = _students[idx].copyWith(studentClass: cleanTarget);
+        _students[idx] = updated;
+        await _firestoreService.saveStudent(updated);
+      }
+    }
+    notifyListeners();
+    await addAuditLog('class', 'MOVE_STUDENTS', 'Moved ${studentIds.length} students to $cleanTarget');
+  }
+
+  // ==================== NOTICES ====================
+  Future<void> saveNotice(Notice notice) async {
+    await _firestoreService.saveNotice(notice);
+    _notices = await _firestoreService.fetchNotices();
+    notifyListeners();
+    await addAuditLog('website', 'SAVE_NOTICE', 'Notice "${notice.heading}" saved');
+  }
+
+  Future<void> deleteNotice(String id) async {
+    await _firestoreService.deleteNotice(id);
+    _notices = await _firestoreService.fetchNotices();
+    notifyListeners();
+    await addAuditLog('website', 'DELETE_NOTICE', 'Notice deleted');
+  }
+
+  // ==================== GALLERY ====================
+  Future<void> saveGalleryItem(GalleryItem item) async {
+    await _firestoreService.saveGalleryItem(item);
+    _gallery = await _firestoreService.fetchGallery();
+    notifyListeners();
+    await addAuditLog('website', 'SAVE_GALLERY', 'Gallery photo saved');
+  }
+
+  Future<void> deleteGalleryItem(String id) async {
+    await _firestoreService.deleteGalleryItem(id);
+    _gallery = await _firestoreService.fetchGallery();
+    notifyListeners();
+    await addAuditLog('website', 'DELETE_GALLERY', 'Gallery photo deleted');
+  }
+
+  // ==================== ACADEMIC YEARS ====================
+  Future<void> addAcademicYear(AcademicYearConfig config) async {
+    _academicYears.removeWhere((y) => y.label == config.label);
+    _academicYears.insert(0, config);
+    notifyListeners();
+    await _firestoreService.saveAcademicYears(_academicYears);
+    await addAuditLog('class', 'ADD_YEAR', 'Added academic year ${config.label}');
+  }
+
+  Future<void> setWorkingAcademicYear(String yearLabel) async {
+    final updated = _setting.copyWith(activeAcademicYear: yearLabel);
+    await updateSettings(updated);
+    for (int i = 0; i < _academicYears.length; i++) {
+      if (_academicYears[i].label == yearLabel) {
+        _academicYears[i] = AcademicYearConfig(
+          label: _academicYears[i].label,
+          startMonth: _academicYears[i].startMonth,
+          endMonth: _academicYears[i].endMonth,
+          status: 'current',
+        );
+      } else if (_academicYears[i].status == 'current') {
+        _academicYears[i] = AcademicYearConfig(
+          label: _academicYears[i].label,
+          startMonth: _academicYears[i].startMonth,
+          endMonth: _academicYears[i].endMonth,
+          status: 'active',
+        );
+      }
+    }
+    notifyListeners();
+    await _firestoreService.saveAcademicYears(_academicYears);
+    await addAuditLog('class', 'SET_ACTIVE_YEAR', 'Set active academic year to $yearLabel');
+  }
+
+  Future<void> deleteAcademicYear(String yearLabel) async {
+    _academicYears.removeWhere((y) => y.label == yearLabel);
+    notifyListeners();
+    await _firestoreService.saveAcademicYears(_academicYears);
+    await addAuditLog('class', 'DELETE_YEAR', 'Deleted academic year $yearLabel');
+  }
+
+  // ==================== STUDENT SIBLING GROUPS ====================
+  Future<void> saveStudentGroup(StudentGroup group) async {
+    await _firestoreService.saveStudentGroup(group);
+    _studentGroups = await _firestoreService.fetchStudentGroups();
+    notifyListeners();
+    await addAuditLog('group', 'SAVE_GROUP', 'Group "${group.name}" saved with ${group.memberStudentIds.length} members');
+  }
+
+  Future<void> deleteStudentGroup(String id) async {
+    await _firestoreService.deleteStudentGroup(id);
+    _studentGroups = await _firestoreService.fetchStudentGroups();
+    notifyListeners();
+    await addAuditLog('group', 'DELETE_GROUP', 'Deleted group #$id');
+  }
+
+  Future<void> unifyFamilyDetails(String primaryStudentId, List<String> memberIds) async {
+    final primary = _students.firstWhere((s) => s.id == primaryStudentId);
+    for (final mid in memberIds) {
+      if (mid == primaryStudentId) continue;
+      final idx = _students.indexWhere((s) => s.id == mid);
+      if (idx != -1) {
+        final unified = _students[idx].copyWith(
+          father: primary.father,
+          mother: primary.mother,
+          mobile: primary.mobile,
+          motherMobile: primary.motherMobile,
+          address: primary.address,
+        );
+        _students[idx] = unified;
+        await _firestoreService.saveStudent(unified);
+      }
+    }
+    notifyListeners();
+    await addAuditLog('group', 'UNIFY_FAMILY', 'Unified family details for ${memberIds.length} members matching ${primary.name}');
+  }
+
+  // ==================== FEE CONCESSIONS ====================
+  Future<void> saveConcession(FeeConcession concession) async {
+    await _firestoreService.saveConcession(concession);
+    _concessions = await _firestoreService.fetchConcessions();
+    notifyListeners();
+    await addAuditLog('fee', 'SAVE_CONCESSION', 'Set ₹${concession.concessionMonthlyFee} concession for ${concession.studentName}');
+  }
+
+  Future<void> removeConcession(String studentId) async {
+    await _firestoreService.deleteConcession(studentId);
+    _concessions = await _firestoreService.fetchConcessions();
+    notifyListeners();
+    await addAuditLog('fee', 'DELETE_CONCESSION', 'Removed concession for student #$studentId');
+  }
+
+  // ==================== CUSTOM FEE ITEMS ====================
+  Future<void> saveCustomFeeItem(CustomFeeItem item) async {
+    await _firestoreService.saveCustomFee(item);
+    _customFeeItems = await _firestoreService.fetchCustomFees();
+    notifyListeners();
+    await addAuditLog('fee', 'SAVE_FEE_ITEM', 'Custom fee item "${item.name}" saved');
+  }
+
+  Future<void> deleteCustomFeeItem(String id) async {
+    await _firestoreService.deleteCustomFee(id);
+    _customFeeItems = await _firestoreService.fetchCustomFees();
+    notifyListeners();
+    await addAuditLog('fee', 'DELETE_FEE_ITEM', 'Deleted custom fee item #$id');
+  }
+
+  // ==================== AUDIT LOGS ====================
+  Future<void> addAuditLog(String category, String action, String message) async {
+    final entry = AuditLogEntry(
+      id: 'log_${DateTime.now().millisecondsSinceEpoch}',
+      timestamp: DateTime.now().toIso8601String(),
+      category: category,
+      action: action,
+      message: message,
+      adminEmail: _currentStaff?.email ?? _setting.email,
+    );
+    await _firestoreService.addAuditLog(entry);
+    _auditLogs = await _firestoreService.fetchAuditLogs();
+    notifyListeners();
+  }
+
+  Future<void> clearAuditLogs() async {
+    await _firestoreService.clearAuditLogs();
+    _auditLogs.clear();
+    notifyListeners();
+  }
+
+  // ==================== BACKUP & CREDENTIALS ====================
+  Future<String> exportBackupJson() async {
+    await addAuditLog('backup', 'EXPORT_BACKUP', 'Exported JSON backup snapshot');
+    return await _firestoreService.exportDatabaseJson();
   }
 
   // ==================== STAFF MANAGEMENT ====================

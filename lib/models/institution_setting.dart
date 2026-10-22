@@ -21,10 +21,34 @@ class InstitutionSetting {
   final String socialYoutube;
   final String socialInstagram;
   final String socialWhatsapp;
+  final String socialFacebook;
+  final String socialTelegram;
   final int defaultStudentsCount;
   final int defaultTeachersCount;
   final int defaultMaleCount;
   final int defaultFemaleCount;
+
+  // Fee Settings & Window Schedule
+  final double defaultMonthlyFee;
+  final String feeStatusTitle;
+  final int feeCollectStartDay;
+  final int feeCollectEndDay;
+  final String feeNotifyMode;
+  final int feeNotifyDaysBefore;
+  final bool isDefaultFeeReceiptRequired;
+
+  // Bank & UPI Details
+  final String bankAccountName;
+  final String bankUpiNumber;
+  final String bankUpiId;
+  final String bankName;
+  final String bankAccountNumber;
+  final String bankIfsc;
+  final String bankBranch;
+
+  // Student Portal Permissions
+  final bool allowStudentPhotoUpload;
+  final bool allowStudentDetailsEdit;
 
   InstitutionSetting({
     this.appName = 'NIM Higher Secondary',
@@ -49,10 +73,28 @@ class InstitutionSetting {
     this.socialYoutube = 'https://youtube.com',
     this.socialInstagram = 'https://www.instagram.com/muhammed_sanjide_p',
     this.socialWhatsapp = '+919946806268',
+    this.socialFacebook = '',
+    this.socialTelegram = '',
     this.defaultStudentsCount = 326,
     this.defaultTeachersCount = 7,
     this.defaultMaleCount = 155,
     this.defaultFemaleCount = 171,
+    this.defaultMonthlyFee = 400.0,
+    this.feeStatusTitle = 'Monthly Fee Status',
+    this.feeCollectStartDay = 1,
+    this.feeCollectEndDay = 10,
+    this.feeNotifyMode = 'month_start',
+    this.feeNotifyDaysBefore = 5,
+    this.isDefaultFeeReceiptRequired = true,
+    this.bankAccountName = 'Noorul Islam Madrasa Committee',
+    this.bankUpiNumber = '9946806268',
+    this.bankUpiId = 'nimdevathiyal@upi',
+    this.bankName = 'Kerala Gramin Bank',
+    this.bankAccountNumber = '40123456789',
+    this.bankIfsc = 'KLGB0040123',
+    this.bankBranch = 'Chelari',
+    this.allowStudentPhotoUpload = true,
+    this.allowStudentDetailsEdit = false,
   });
 
   factory InstitutionSetting.fromMap(Map<String, dynamic> map) {
@@ -79,10 +121,28 @@ class InstitutionSetting {
       socialYoutube: map['socialYoutube']?.toString() ?? 'https://youtube.com',
       socialInstagram: map['socialInstagram']?.toString() ?? 'https://www.instagram.com/muhammed_sanjide_p',
       socialWhatsapp: map['socialWhatsapp']?.toString() ?? '+919946806268',
+      socialFacebook: map['socialFacebook']?.toString() ?? '',
+      socialTelegram: map['socialTelegram']?.toString() ?? '',
       defaultStudentsCount: int.tryParse(map['defaultStudentsCount']?.toString() ?? '') ?? 326,
       defaultTeachersCount: int.tryParse(map['defaultTeachersCount']?.toString() ?? '') ?? 7,
       defaultMaleCount: int.tryParse(map['defaultMaleCount']?.toString() ?? '') ?? 155,
       defaultFemaleCount: int.tryParse(map['defaultFemaleCount']?.toString() ?? '') ?? 171,
+      defaultMonthlyFee: double.tryParse(map['defaultMonthlyFee']?.toString() ?? '') ?? 400.0,
+      feeStatusTitle: map['feeStatusTitle']?.toString() ?? 'Monthly Fee Status',
+      feeCollectStartDay: int.tryParse(map['feeCollectStartDay']?.toString() ?? '') ?? 1,
+      feeCollectEndDay: int.tryParse(map['feeCollectEndDay']?.toString() ?? '') ?? 10,
+      feeNotifyMode: map['feeNotifyMode']?.toString() ?? 'month_start',
+      feeNotifyDaysBefore: int.tryParse(map['feeNotifyDaysBefore']?.toString() ?? '') ?? 5,
+      isDefaultFeeReceiptRequired: map['isDefaultFeeReceiptRequired'] == null ? true : (map['isDefaultFeeReceiptRequired'] == true || map['isDefaultFeeReceiptRequired'].toString().toLowerCase() == 'true'),
+      bankAccountName: map['bankAccountName']?.toString() ?? 'Noorul Islam Madrasa Committee',
+      bankUpiNumber: map['bankUpiNumber']?.toString() ?? '9946806268',
+      bankUpiId: map['bankUpiId']?.toString() ?? 'nimdevathiyal@upi',
+      bankName: map['bankName']?.toString() ?? 'Kerala Gramin Bank',
+      bankAccountNumber: map['bankAccountNumber']?.toString() ?? '40123456789',
+      bankIfsc: map['bankIfsc']?.toString() ?? 'KLGB0040123',
+      bankBranch: map['bankBranch']?.toString() ?? 'Chelari',
+      allowStudentPhotoUpload: map['allowStudentPhotoUpload'] == null ? true : (map['allowStudentPhotoUpload'] == true || map['allowStudentPhotoUpload'].toString().toLowerCase() == 'true'),
+      allowStudentDetailsEdit: map['allowStudentDetailsEdit'] == null ? false : (map['allowStudentDetailsEdit'] == true || map['allowStudentDetailsEdit'].toString().toLowerCase() == 'true'),
     );
   }
 
@@ -114,10 +174,28 @@ class InstitutionSetting {
       'socialYoutube': socialYoutube,
       'socialInstagram': socialInstagram,
       'socialWhatsapp': socialWhatsapp,
+      'socialFacebook': socialFacebook,
+      'socialTelegram': socialTelegram,
       'defaultStudentsCount': defaultStudentsCount,
       'defaultTeachersCount': defaultTeachersCount,
       'defaultMaleCount': defaultMaleCount,
       'defaultFemaleCount': defaultFemaleCount,
+      'defaultMonthlyFee': defaultMonthlyFee,
+      'feeStatusTitle': feeStatusTitle,
+      'feeCollectStartDay': feeCollectStartDay,
+      'feeCollectEndDay': feeCollectEndDay,
+      'feeNotifyMode': feeNotifyMode,
+      'feeNotifyDaysBefore': feeNotifyDaysBefore,
+      'isDefaultFeeReceiptRequired': isDefaultFeeReceiptRequired,
+      'bankAccountName': bankAccountName,
+      'bankUpiNumber': bankUpiNumber,
+      'bankUpiId': bankUpiId,
+      'bankName': bankName,
+      'bankAccountNumber': bankAccountNumber,
+      'bankIfsc': bankIfsc,
+      'bankBranch': bankBranch,
+      'allowStudentPhotoUpload': allowStudentPhotoUpload,
+      'allowStudentDetailsEdit': allowStudentDetailsEdit,
     };
   }
 
@@ -144,10 +222,28 @@ class InstitutionSetting {
     String? socialYoutube,
     String? socialInstagram,
     String? socialWhatsapp,
+    String? socialFacebook,
+    String? socialTelegram,
     int? defaultStudentsCount,
     int? defaultTeachersCount,
     int? defaultMaleCount,
     int? defaultFemaleCount,
+    double? defaultMonthlyFee,
+    String? feeStatusTitle,
+    int? feeCollectStartDay,
+    int? feeCollectEndDay,
+    String? feeNotifyMode,
+    int? feeNotifyDaysBefore,
+    bool? isDefaultFeeReceiptRequired,
+    String? bankAccountName,
+    String? bankUpiNumber,
+    String? bankUpiId,
+    String? bankName,
+    String? bankAccountNumber,
+    String? bankIfsc,
+    String? bankBranch,
+    bool? allowStudentPhotoUpload,
+    bool? allowStudentDetailsEdit,
   }) {
     return InstitutionSetting(
       appName: appName ?? this.appName,
@@ -172,10 +268,28 @@ class InstitutionSetting {
       socialYoutube: socialYoutube ?? this.socialYoutube,
       socialInstagram: socialInstagram ?? this.socialInstagram,
       socialWhatsapp: socialWhatsapp ?? this.socialWhatsapp,
+      socialFacebook: socialFacebook ?? this.socialFacebook,
+      socialTelegram: socialTelegram ?? this.socialTelegram,
       defaultStudentsCount: defaultStudentsCount ?? this.defaultStudentsCount,
       defaultTeachersCount: defaultTeachersCount ?? this.defaultTeachersCount,
       defaultMaleCount: defaultMaleCount ?? this.defaultMaleCount,
       defaultFemaleCount: defaultFemaleCount ?? this.defaultFemaleCount,
+      defaultMonthlyFee: defaultMonthlyFee ?? this.defaultMonthlyFee,
+      feeStatusTitle: feeStatusTitle ?? this.feeStatusTitle,
+      feeCollectStartDay: feeCollectStartDay ?? this.feeCollectStartDay,
+      feeCollectEndDay: feeCollectEndDay ?? this.feeCollectEndDay,
+      feeNotifyMode: feeNotifyMode ?? this.feeNotifyMode,
+      feeNotifyDaysBefore: feeNotifyDaysBefore ?? this.feeNotifyDaysBefore,
+      isDefaultFeeReceiptRequired: isDefaultFeeReceiptRequired ?? this.isDefaultFeeReceiptRequired,
+      bankAccountName: bankAccountName ?? this.bankAccountName,
+      bankUpiNumber: bankUpiNumber ?? this.bankUpiNumber,
+      bankUpiId: bankUpiId ?? this.bankUpiId,
+      bankName: bankName ?? this.bankName,
+      bankAccountNumber: bankAccountNumber ?? this.bankAccountNumber,
+      bankIfsc: bankIfsc ?? this.bankIfsc,
+      bankBranch: bankBranch ?? this.bankBranch,
+      allowStudentPhotoUpload: allowStudentPhotoUpload ?? this.allowStudentPhotoUpload,
+      allowStudentDetailsEdit: allowStudentDetailsEdit ?? this.allowStudentDetailsEdit,
     );
   }
 }
