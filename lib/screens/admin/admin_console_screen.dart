@@ -131,9 +131,23 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
   // Advanced Fee Item Form
   final _customFeeNameCtrl = TextEditingController();
   final _customFeeGlobalAmtCtrl = TextEditingController();
+  final _customFeeSpecificAmtCtrl = TextEditingController();
   String _customFeeScope = 'global';
   String? _customFeeSpecificClass;
   bool _customFeeReceiptReq = false;
+  final Map<String, TextEditingController> _customFeeClassAmtCtrls = {};
+
+  // Fee Concessions State
+  String? _concClassFilter;
+  final _concSearchCtrl = TextEditingController();
+  String? _activeConcClassFilter;
+  final _activeConcSearchCtrl = TextEditingController();
+  Student? _concSelectedStudent;
+  final _concAmountCtrl = TextEditingController(text: '200');
+  final _concReasonCtrl = TextEditingController(text: 'BPL / Financial Assistance');
+
+  // Sibling Groups Filter
+  final _groupSearchCtrl = TextEditingController();
 
   // Discontinue Student Form
   String? _discClassFilter;
@@ -287,6 +301,15 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
     _feeTitleCtrl.dispose();
     _customFeeNameCtrl.dispose();
     _customFeeGlobalAmtCtrl.dispose();
+    _customFeeSpecificAmtCtrl.dispose();
+    for (final ctrl in _customFeeClassAmtCtrls.values) {
+      ctrl.dispose();
+    }
+    _concSearchCtrl.dispose();
+    _activeConcSearchCtrl.dispose();
+    _concAmountCtrl.dispose();
+    _concReasonCtrl.dispose();
+    _groupSearchCtrl.dispose();
     _discSearchCtrl.dispose();
     _discDateCtrl.dispose();
     _discReasonCtrl.dispose();
@@ -5071,193 +5094,695 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
   // ========================================================================
   // MODULE 4: FINANCE & FEES
   // ========================================================================
+
   // ========================================================================
   // 4A. FEE SETTINGS & WINDOWS
   // ========================================================================
   Widget _buildFeeSettingsTab(InstitutionProvider provider, dynamic setting) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Monthly Fee Configuration & Collection Window', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(child: TextField(controller: _defaultFeeCtrl, decoration: const InputDecoration(labelText: 'Default Monthly Fee (₹) *', border: OutlineInputBorder()))),
-                const SizedBox(width: 10),
-                Expanded(child: TextField(controller: _feeTitleCtrl, decoration: const InputDecoration(labelText: 'Fee Status Title (PDF Report)', border: OutlineInputBorder()))),
-              ],
-            ),
-            const SizedBox(height: 16),
+    String notifySummaryText;
+    if (_feeNotifyMode == 'month_start') {
+      notifySummaryText = 'Student fee alerts will start on the 1st of every month.';
+    } else if (_feeNotifyMode == 'collection_start') {
+      notifySummaryText = 'Student fee alerts will start on the collection start date (Day $_feeStartDay).';
+    } else if (_feeNotifyMode == 'days_before_end') {
+      notifySummaryText = 'Student fee alerts will start $_feeNotifyDaysBefore days before collection deadline (Day $_feeEndDay).';
+    } else {
+      notifySummaryText = 'Student fee alerts will start before the end of the monthly billing period.';
+    }
 
-            // Window Days
-            const Text('Monthly Collection Window Days', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<int>(
-                    value: _feeStartDay,
-                    decoration: const InputDecoration(labelText: 'Collection Start Day (Day of Month)', border: OutlineInputBorder()),
-                    items: List.generate(28, (i) => DropdownMenuItem(value: i + 1, child: Text('Day ${i + 1}'))),
-                    onChanged: (v) => setState(() => _feeStartDay = v ?? 1),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: DropdownButtonFormField<int>(
-                    value: _feeEndDay,
-                    decoration: const InputDecoration(labelText: 'Due / Deadline Day (Day of Month)', border: OutlineInputBorder()),
-                    items: List.generate(28, (i) => DropdownMenuItem(value: i + 1, child: Text('Day ${i + 1}'))),
-                    onChanged: (v) => setState(() => _feeEndDay = v ?? 10),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Alert Notification Schedule
-            const Text('Student Fee Alert Notification Timing', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: _feeNotifyMode,
-              decoration: const InputDecoration(border: OutlineInputBorder()),
-              items: const [
-                DropdownMenuItem(value: 'month_start', child: Text('From Month Start (Day 1 of every month)')),
-                DropdownMenuItem(value: 'collection_start', child: Text('From Collection Start Day')),
-                DropdownMenuItem(value: 'days_before_end', child: Text('5 Days Before Due Date')),
-              ],
-              onChanged: (v) => setState(() => _feeNotifyMode = v ?? 'month_start'),
-            ),
-            const SizedBox(height: 14),
-
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              value: _isReceiptReq,
-              onChanged: (v) => setState(() => _isReceiptReq = v),
-              title: const Text('Is Receipt Number Mandatory for Cashier?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-              subtitle: const Text('When enabled, fees cannot be recorded without an official receipt number.', style: TextStyle(fontSize: 11.5)),
-            ),
-            const SizedBox(height: 16),
-
-            Align(
-              alignment: Alignment.centerRight,
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  final fee = double.tryParse(_defaultFeeCtrl.text.trim()) ?? 400.0;
-                  final updated = setting.copyWith(
-                    defaultMonthlyFee: fee,
-                    feeStatusTitle: _feeTitleCtrl.text.trim(),
-                    feeCollectStartDay: _feeStartDay,
-                    feeCollectEndDay: _feeEndDay,
-                    feeNotifyMode: _feeNotifyMode,
-                    isDefaultFeeReceiptRequired: _isReceiptReq,
-                  );
-                  await provider.updateSettings(updated);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Fee settings & schedule saved!')));
-                },
-                icon: const Icon(Icons.save, size: 16),
-                label: const Text('Save Fee Settings'),
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // 4B. ADVANCED FEE BUILDER
-  Widget _buildAdvancedFeeBuilderTab(InstitutionProvider provider) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header Card
           Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
-            child: Column(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 10, offset: Offset(0, 4))],
+            ),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Create Custom Fee Item', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(child: TextField(controller: _customFeeNameCtrl, decoration: const InputDecoration(labelText: 'Fee Item Name (e.g. Books & Stationery)', border: OutlineInputBorder()))),
-                    const SizedBox(width: 10),
-                    Expanded(child: TextField(controller: _customFeeGlobalAmtCtrl, decoration: const InputDecoration(labelText: 'Amount (₹)', border: OutlineInputBorder()))),
-                  ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('FINANCE & REVENUE CONTROL', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Color(0xFF64748B), letterSpacing: 1.2)),
+                      const SizedBox(height: 4),
+                      const Text('Monthly Fee Configuration & Collection Window', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+                      const SizedBox(height: 4),
+                      const Text('Set institutional default tuition fees, monthly collection window dates, automated alert triggers, and cashier validation rules.', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B))),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 12),
-                ElevatedButton.icon(
-                  onPressed: () async {
-                    if (_customFeeNameCtrl.text.isEmpty) return;
-                    final amt = double.tryParse(_customFeeGlobalAmtCtrl.text) ?? 0.0;
-                    final fee = CustomFeeItem(
-                      id: 'fee_${DateTime.now().millisecondsSinceEpoch}',
-                      name: _customFeeNameCtrl.text.trim(),
-                      globalAmount: amt,
-                    );
-                    await provider.saveCustomFeeItem(fee);
-                    _customFeeNameCtrl.clear();
-                    _customFeeGlobalAmtCtrl.clear();
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Fee Item ${fee.name} added!')));
-                  },
-                  icon: const Icon(Icons.add, size: 16),
-                  label: const Text('Add Fee Item'),
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFBFDBFE))),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      const Text('BASE MONTHLY FEE', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF1E40AF))),
+                      const SizedBox(height: 2),
+                      Text('${setting.currencySymbol}${setting.defaultMonthlyFee.toStringAsFixed(0)}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFF2563EB))),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
 
-          // Active Fee Catalogue Items
-          Text('Configured Fee Items (${provider.customFeeItems.length})', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-          const SizedBox(height: 10),
-          ...provider.customFeeItems.map((f) => Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFE2E8F0))),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          // Main Configuration Card
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 10, offset: Offset(0, 4))],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(f.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                 Row(
                   children: [
-                    Text('₹${f.globalAmount.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
-                    const SizedBox(width: 4),
-                    IconButton(
-                      icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF2563EB)),
-                      tooltip: 'Edit Fee Item',
-                      onPressed: () => _showEditCustomFeeModal(f, provider),
+                    Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF2563EB), shape: BoxShape.circle)),
+                    const SizedBox(width: 8),
+                    const Text('Default Tuition & Billing Configuration', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                  ],
+                ),
+                const Divider(height: 24),
+
+                // Base Tuition inputs
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _defaultFeeCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'School Default Monthly Fee (${setting.currencySymbol}) *',
+                          hintText: 'e.g. 400',
+                          border: const OutlineInputBorder(),
+                          isDense: true,
+                          prefixIcon: const Icon(Icons.currency_rupee_rounded, size: 18),
+                        ),
+                        keyboardType: TextInputType.number,
+                      ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                      tooltip: 'Delete Fee Item',
-                      onPressed: () async {
-                        final confirmed = await _confirmAction(
-                          context,
-                          title: 'Delete Fee Item',
-                          message: 'Are you sure you want to permanently delete custom fee item "${f.name}"?',
-                          confirmLabel: 'Delete Item',
-                        );
-                        if (confirmed) {
-                          await provider.deleteCustomFeeItem(f.id);
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Fee Item "${f.name}" deleted.')));
-                        }
-                      },
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: TextField(
+                        controller: _feeTitleCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Fee Status Title (For PDF Receipts & Reports) *',
+                          hintText: 'e.g. Tuition Fee / Monthly Fee',
+                          border: const OutlineInputBorder(),
+                          isDense: true,
+                          prefixIcon: Icon(Icons.title_rounded, size: 18),
+                        ),
+                      ),
                     ),
                   ],
                 ),
+                const SizedBox(height: 20),
+
+                // Monthly Collection Window & Alert Schedule Panel
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.calendar_month_rounded, color: Color(0xFF2563EB), size: 18),
+                              const SizedBox(width: 8),
+                              const Text('Monthly Collection Window & Student Alert Schedule', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Color(0xFF0F172A))),
+                            ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(6), border: Border.all(color: const Color(0xFFBFDBFE))),
+                            child: Text('Every Month: Day $_feeStartDay to Day $_feeEndDay', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1E40AF))),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<int>(
+                              value: _feeStartDay,
+                              decoration: const InputDecoration(labelText: 'Collection Start Day (Every Month) *', border: OutlineInputBorder(), isDense: true),
+                              items: List.generate(28, (i) => DropdownMenuItem(value: i + 1, child: Text('Day ${i + 1} of month', style: const TextStyle(fontSize: 12.5)))),
+                              onChanged: (v) => setState(() => _feeStartDay = v ?? 1),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: DropdownButtonFormField<int>(
+                              value: _feeEndDay,
+                              decoration: const InputDecoration(labelText: 'Collection Due / Deadline Day (Every Month) *', border: OutlineInputBorder(), isDense: true),
+                              items: List.generate(28, (i) => DropdownMenuItem(value: i + 1, child: Text('Day ${i + 1} of month', style: const TextStyle(fontSize: 12.5)))),
+                              onChanged: (v) => setState(() => _feeEndDay = v ?? 10),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: DropdownButtonFormField<String>(
+                              value: _feeNotifyMode,
+                              decoration: const InputDecoration(labelText: 'Student Fee Alert Notification Timing *', border: OutlineInputBorder(), isDense: true),
+                              items: const [
+                                DropdownMenuItem(value: 'month_start', child: Text('From Month Start (Day 1 of every month)', style: TextStyle(fontSize: 12.5))),
+                                DropdownMenuItem(value: 'collection_start', child: Text('From Collection Start Day', style: TextStyle(fontSize: 12.5))),
+                                DropdownMenuItem(value: 'days_before_end', child: Text('Before Collection Due Date (Days Before)', style: TextStyle(fontSize: 12.5))),
+                                DropdownMenuItem(value: 'days_before_month_end', child: Text('Before Month Ends (Days Before Month End)', style: TextStyle(fontSize: 12.5))),
+                              ],
+                              onChanged: (v) => setState(() => _feeNotifyMode = v ?? 'month_start'),
+                            ),
+                          ),
+                          if (_feeNotifyMode == 'days_before_end' || _feeNotifyMode == 'days_before_month_end') ...[
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: DropdownButtonFormField<int>(
+                                value: _feeNotifyDaysBefore,
+                                decoration: const InputDecoration(labelText: 'Days Before *', border: OutlineInputBorder(), isDense: true),
+                                items: [2, 3, 5, 7, 10].map((d) => DropdownMenuItem(value: d, child: Text('$d days before', style: const TextStyle(fontSize: 12.5)))).toList(),
+                                onChanged: (v) => setState(() => _feeNotifyDaysBefore = v ?? 5),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Dynamic Live Summary Banner
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFCBD5E1))),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.notifications_active_rounded, color: Color(0xFF2563EB), size: 16),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Regular monthly fee collection runs from the ${_feeStartDay}th to the ${_feeEndDay}th of every month. $notifySummaryText',
+                                style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Cashier Validation Toggle
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: _isReceiptReq,
+                    activeColor: const Color(0xFF2563EB),
+                    onChanged: (v) => setState(() => _isReceiptReq = v),
+                    title: const Text('Is Receipt Number Mandatory for Cashier?', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Color(0xFF0F172A))),
+                    subtitle: const Text('When enabled, the cashier fee collection terminal cannot record payments without an official receipt number.', style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      final fee = double.tryParse(_defaultFeeCtrl.text.trim()) ?? 400.0;
+                      final updated = setting.copyWith(
+                        defaultMonthlyFee: fee,
+                        feeStatusTitle: _feeTitleCtrl.text.trim().isNotEmpty ? _feeTitleCtrl.text.trim() : 'Tuition Fee',
+                        feeCollectStartDay: _feeStartDay,
+                        feeCollectEndDay: _feeEndDay,
+                        feeNotifyMode: _feeNotifyMode,
+                        feeNotifyDaysBefore: _feeNotifyDaysBefore,
+                        isDefaultFeeReceiptRequired: _isReceiptReq,
+                      );
+                      await provider.updateSettings(updated);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Fee configuration, window dates, and alert schedule successfully saved!'),
+                            backgroundColor: Color(0xFF2563EB),
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.save_rounded, size: 18),
+                    label: const Text('Save Fee Configuration', style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2563EB),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
               ],
             ),
-          )),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ========================================================================
+  // 4B. ADVANCED FEE BUILDER
+  // ========================================================================
+  Widget _buildAdvancedFeeBuilderTab(InstitutionProvider provider) {
+    // Populate per-class controllers if needed
+    for (final c in provider.classes) {
+      if (!_customFeeClassAmtCtrls.containsKey(c)) {
+        _customFeeClassAmtCtrls[c] = TextEditingController(text: '0');
+      }
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Card
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 10, offset: Offset(0, 4))],
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('FEE STRUCTURE ARCHITECTURE', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Color(0xFF64748B), letterSpacing: 1.2)),
+                      const SizedBox(height: 4),
+                      const Text('Advanced Fee Item Builder', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+                      const SizedBox(height: 4),
+                      const Text('Create and manage custom institutional fee heads (Exam fees, Books, Sports, Annual development) with Global, Class-wise, or Specific Class scopes.', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B))),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFE2E8F0))),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      const Text('CUSTOM ITEMS', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                      const SizedBox(height: 2),
+                      Text('${provider.customFeeItems.length}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+
+          // Create Fee Item Card
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 10, offset: Offset(0, 4))],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF059669), shape: BoxShape.circle)),
+                    const SizedBox(width: 8),
+                    const Text('Create Custom Fee Item', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                  ],
+                ),
+                const Divider(height: 24),
+
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: TextField(
+                        controller: _customFeeNameCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Fee Item Name *',
+                          hintText: 'e.g. Admission Fee, Examination, Books & Uniform',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      flex: 2,
+                      child: DropdownButtonFormField<String>(
+                        value: _customFeeScope,
+                        decoration: const InputDecoration(labelText: 'Fee Scope (Category) *', border: OutlineInputBorder(), isDense: true),
+                        items: const [
+                          DropdownMenuItem(value: 'global', child: Text('Option A: Global (Same for all classes)', style: TextStyle(fontSize: 12.5))),
+                          DropdownMenuItem(value: 'class-wise', child: Text('Option B: Class-wise (Different per class)', style: TextStyle(fontSize: 12.5))),
+                          DropdownMenuItem(value: 'specific', child: Text('Option C: Specific Class Only', style: TextStyle(fontSize: 12.5))),
+                        ],
+                        onChanged: (v) => setState(() => _customFeeScope = v ?? 'global'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Conditional Scope Amount Inputs
+                if (_customFeeScope == 'global') ...[
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 260,
+                          child: TextField(
+                            controller: _customFeeGlobalAmtCtrl,
+                            decoration: const InputDecoration(labelText: 'Global Amount (₹) *', hintText: 'e.g. 500', border: OutlineInputBorder(), isDense: true, prefixIcon: Icon(Icons.currency_rupee_rounded, size: 16)),
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        const Expanded(child: Text('This single fixed amount applies uniformly across every student in all classes.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B)))),
+                      ],
+                    ),
+                  ),
+                ] else if (_customFeeScope == 'class-wise') ...[
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Set Custom Amount for Each Class:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: Color(0xFF0F172A))),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 10,
+                          children: provider.classes.map((c) {
+                            return SizedBox(
+                              width: 140,
+                              child: TextField(
+                                controller: _customFeeClassAmtCtrls[c],
+                                decoration: InputDecoration(labelText: 'Class $c (₹)', border: const OutlineInputBorder(), isDense: true),
+                                keyboardType: TextInputType.number,
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else if (_customFeeScope == 'specific') ...[
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 220,
+                          child: DropdownButtonFormField<String>(
+                            value: _customFeeSpecificClass ?? (provider.classes.isNotEmpty ? provider.classes.first : null),
+                            decoration: const InputDecoration(labelText: 'Target Class *', border: OutlineInputBorder(), isDense: true),
+                            items: provider.classes.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12.5)))).toList(),
+                            onChanged: (v) => setState(() => _customFeeSpecificClass = v),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        SizedBox(
+                          width: 200,
+                          child: TextField(
+                            controller: _customFeeSpecificAmtCtrl,
+                            decoration: const InputDecoration(labelText: 'Amount (₹) *', border: OutlineInputBorder(), isDense: true, prefixIcon: Icon(Icons.currency_rupee_rounded, size: 16)),
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        const Expanded(child: Text('Only students enrolled in this target class will be billed this fee item.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B)))),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
+
+                // Mandatory Receipt Checkbox
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFE2E8F0))),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Is Official Receipt Number Mandatory for this fee item?', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                      Switch(
+                        value: _customFeeReceiptReq,
+                        activeColor: const Color(0xFF059669),
+                        onChanged: (v) => setState(() => _customFeeReceiptReq = v),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      final name = _customFeeNameCtrl.text.trim();
+                      if (name.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a Fee Item Name!')));
+                        return;
+                      }
+
+                      double gAmt = 0.0;
+                      final cwMap = <String, double>{};
+                      String specClass = '';
+
+                      if (_customFeeScope == 'global') {
+                        gAmt = double.tryParse(_customFeeGlobalAmtCtrl.text.trim()) ?? 0.0;
+                      } else if (_customFeeScope == 'class-wise') {
+                        for (final entry in _customFeeClassAmtCtrls.entries) {
+                          cwMap[entry.key] = double.tryParse(entry.value.text.trim()) ?? 0.0;
+                        }
+                      } else if (_customFeeScope == 'specific') {
+                        specClass = _customFeeSpecificClass ?? (provider.classes.isNotEmpty ? provider.classes.first : '');
+                        gAmt = double.tryParse(_customFeeSpecificAmtCtrl.text.trim()) ?? 0.0;
+                      }
+
+                      final fee = CustomFeeItem(
+                        id: 'fee_${DateTime.now().millisecondsSinceEpoch}',
+                        name: name,
+                        scope: _customFeeScope,
+                        globalAmount: gAmt,
+                        classWiseAmounts: cwMap,
+                        specificClass: specClass,
+                        isReceiptRequired: _customFeeReceiptReq,
+                      );
+
+                      await provider.saveCustomFeeItem(fee);
+                      _customFeeNameCtrl.clear();
+                      _customFeeGlobalAmtCtrl.clear();
+                      _customFeeSpecificAmtCtrl.clear();
+
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Fee Item "$name" created successfully!'), backgroundColor: const Color(0xFF059669)));
+                      }
+                    },
+                    icon: const Icon(Icons.add_task_rounded, size: 18),
+                    label: const Text('Create Fee Item', style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF059669),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 22),
+
+          // Active Fee Items Management Grid
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 10, offset: Offset(0, 4))],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Active Fee Catalogue Items', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(6)),
+                      child: Text('${provider.customFeeItems.length} Items Configured', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                    ),
+                  ],
+                ),
+                const Divider(height: 20),
+
+                if (provider.customFeeItems.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(32),
+                    alignment: Alignment.center,
+                    child: Column(
+                      children: [
+                        Icon(Icons.inventory_2_outlined, size: 40, color: Colors.grey.shade400),
+                        const SizedBox(height: 8),
+                        const Text('No custom fee items configured yet. Create one above to get started.', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+                      ],
+                    ),
+                  )
+                else
+                  ...provider.customFeeItems.map((f) {
+                    final isGlobal = f.scope == 'global';
+                    final isClassWise = f.scope == 'class-wise';
+                    final isSpecific = f.scope == 'specific';
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        boxShadow: const [BoxShadow(color: Color(0x060F172A), blurRadius: 6, offset: Offset(0, 2))],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(10)),
+                            child: const Icon(Icons.receipt_rounded, color: Color(0xFF2563EB), size: 20),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(f.name, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Color(0xFF0F172A))),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: isGlobal ? const Color(0xFFEFF6FF) : (isClassWise ? const Color(0xFFFAF5FF) : const Color(0xFFFFFBEB)),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: isGlobal ? const Color(0xFFBFDBFE) : (isClassWise ? const Color(0xFFE9D5FF) : const Color(0xFFFDE68A))),
+                                      ),
+                                      child: Text(
+                                        isGlobal ? 'Global' : (isClassWise ? 'Class-wise' : 'Class ${f.specificClass} Only'),
+                                        style: TextStyle(
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: isGlobal ? const Color(0xFF1E40AF) : (isClassWise ? const Color(0xFF7E22CE) : const Color(0xFFB45309)),
+                                        ),
+                                      ),
+                                    ),
+                                    if (f.isReceiptRequired) ...[
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(4), border: Border.all(color: const Color(0xFFA7F3D0))),
+                                        child: const Text('Receipt Req', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF047857))),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                if (isGlobal)
+                                  Text('Rate: ₹${f.globalAmount.toStringAsFixed(0)} (Uniform for all classes)', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)))
+                                else if (isClassWise)
+                                  Text('Class-wise rates configured across ${f.classWiseAmounts.length} classes', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)))
+                                else
+                                  Text('Rate: ₹${f.globalAmount.toStringAsFixed(0)} strictly for Class ${f.specificClass}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                              ],
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.edit_outlined, size: 20, color: Color(0xFF2563EB)),
+                                tooltip: 'Edit Fee Item',
+                                onPressed: () => _showEditCustomFeeModal(f, provider),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline_rounded, size: 20, color: Color(0xFFE11D48)),
+                                tooltip: 'Delete Fee Item',
+                                onPressed: () async {
+                                  final confirmed = await _confirmAction(
+                                    context,
+                                    title: 'Delete Fee Item',
+                                    message: 'Are you sure you want to permanently delete custom fee item "${f.name}"? Active ledgers referencing this item will retain their paid receipts.',
+                                    confirmLabel: 'Delete Item',
+                                    confirmColor: const Color(0xFFE11D48),
+                                  );
+                                  if (confirmed) {
+                                    await provider.deleteCustomFeeItem(f.id);
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Fee Item "${f.name}" deleted.')));
+                                    }
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -5266,150 +5791,30 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
   void _showEditCustomFeeModal(CustomFeeItem f, InstitutionProvider provider) {
     final nameCtrl = TextEditingController(text: f.name);
     final amtCtrl = TextEditingController(text: f.globalAmount.toStringAsFixed(0));
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Edit Fee Item: ${f.name}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Fee Name', border: OutlineInputBorder())),
-            const SizedBox(height: 12),
-            TextField(controller: amtCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Amount (₹)', border: OutlineInputBorder())),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
-            onPressed: () async {
-              final newName = nameCtrl.text.trim();
-              final newAmt = double.tryParse(amtCtrl.text.trim()) ?? f.globalAmount;
-              if (newName.isNotEmpty) {
-                final updated = f.copyWith(name: newName, globalAmount: newAmt);
-                await provider.saveCustomFeeItem(updated);
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Fee Item "${updated.name}" updated!')));
-              }
-            },
-            child: const Text('Save Changes'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 4C. SIBLING GROUPS
-  Widget _buildSiblingGroupsTab(InstitutionProvider provider) {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('Student Sibling Groups (${provider.studentGroups.length})', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-            ElevatedButton.icon(
-              onPressed: () => _showCreateGroupModal(provider),
-              icon: const Icon(Icons.group_add_rounded, size: 16),
-              label: const Text('Create Sibling Group'),
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        if (provider.studentGroups.isEmpty)
-          const Center(child: Padding(padding: EdgeInsets.all(30), child: Text('No student sibling groups created yet.')))
-        else
-          ...provider.studentGroups.map((g) => Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(g.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-                    const SizedBox(height: 2),
-                    Text('${g.memberStudentIds.length} Sibling Members • Group Fee: ₹${g.monthlyFee.toStringAsFixed(0)}/month', style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
-                  ],
-                ),
-                Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF2563EB)),
-                      tooltip: 'Edit Sibling Group',
-                      onPressed: () => _showEditStudentGroupModal(g, provider),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                      tooltip: 'Delete Sibling Group',
-                      onPressed: () async {
-                        final confirmed = await _confirmAction(
-                          context,
-                          title: 'Delete Sibling Group',
-                          message: 'Are you sure you want to permanently delete sibling group "${g.name}"?',
-                          confirmLabel: 'Delete Group',
-                        );
-                        if (confirmed) {
-                          await provider.deleteStudentGroup(g.id);
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Sibling Group "${g.name}" deleted.')));
-                        }
-                      },
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          )),
-      ],
-    );
-  }
-
-  void _showCreateGroupModal(InstitutionProvider provider) {
-    final nameCtrl = TextEditingController(text: 'Family Group');
-    final feeCtrl = TextEditingController(text: '800');
-    final selectedIds = <String>{};
+    bool receiptReq = f.isReceiptRequired;
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDlg) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Create Student Sibling Group', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-          content: SingleChildScrollView(
+          title: Text('Edit Fee Item: ${f.name}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          content: SizedBox(
+            width: 440,
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Group Name', border: OutlineInputBorder())),
-                const SizedBox(height: 8),
-                TextField(controller: feeCtrl, decoration: const InputDecoration(labelText: 'Group Monthly Fee (₹)', border: OutlineInputBorder())),
+                TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Fee Name *', border: OutlineInputBorder(), isDense: true)),
                 const SizedBox(height: 12),
-                const Text('Select Sibling Members:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 6),
-                Container(
-                  constraints: const BoxConstraints(maxHeight: 200),
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: provider.activeStudents.take(20).length,
-                    itemBuilder: (ctx, idx) {
-                      final s = provider.activeStudents[idx];
-                      final isSel = selectedIds.contains(s.id);
-                      return CheckboxListTile(
-                        dense: true,
-                        value: isSel,
-                        title: Text('${s.name} (${s.studentClass})', style: const TextStyle(fontSize: 12)),
-                        onChanged: (v) {
-                          setDlg(() {
-                            if (v == true) selectedIds.add(s.id); else selectedIds.remove(s.id);
-                          });
-                        },
-                      );
-                    },
-                  ),
+                if (f.scope == 'global' || f.scope == 'specific')
+                  TextField(controller: amtCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Amount (₹) *', border: OutlineInputBorder(), isDense: true)),
+                const SizedBox(height: 12),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: receiptReq,
+                  title: const Text('Is Receipt Number Mandatory?', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                  onChanged: (v) => setDlg(() => receiptReq = v ?? false),
                 ),
               ],
             ),
@@ -5417,25 +5822,371 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
             ElevatedButton(
-              onPressed: () {
-                if (selectedIds.length < 2) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select at least 2 sibling students!')));
-                  return;
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
+              onPressed: () async {
+                final newName = nameCtrl.text.trim();
+                final newAmt = double.tryParse(amtCtrl.text.trim()) ?? f.globalAmount;
+                if (newName.isNotEmpty) {
+                  final updated = f.copyWith(name: newName, globalAmount: newAmt, isReceiptRequired: receiptReq);
+                  await provider.saveCustomFeeItem(updated);
+                  if (mounted) {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Fee Item "${updated.name}" updated!')));
+                    setState(() {});
+                  }
                 }
-                final group = StudentGroup(
-                  id: 'grp_${DateTime.now().millisecondsSinceEpoch}',
-                  name: nameCtrl.text.trim(),
-                  monthlyFee: double.tryParse(feeCtrl.text) ?? 800.0,
-                  memberStudentIds: selectedIds.toList(),
-                );
-                provider.saveStudentGroup(group);
-                provider.unifyFamilyDetails(selectedIds.first, selectedIds.toList());
-                Navigator.pop(ctx);
               },
-              child: const Text('Create & Unify Details'),
+              child: const Text('Save Changes'),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // ========================================================================
+  // 4C. SIBLING GROUPS
+  // ========================================================================
+  Widget _buildSiblingGroupsTab(InstitutionProvider provider) {
+    final groups = provider.studentGroups;
+    final q = _groupSearchCtrl.text.trim().toLowerCase();
+    final filtered = groups.where((g) {
+      if (q.isEmpty) return true;
+      return g.name.toLowerCase().contains(q);
+    }).toList();
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Card
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 10, offset: Offset(0, 4))],
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('FAMILY & SIBLING CONCESSIONS', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Color(0xFF64748B), letterSpacing: 1.2)),
+                      const SizedBox(height: 4),
+                      const Text('Student Sibling Groups & Family Bundles', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+                      const SizedBox(height: 4),
+                      const Text('Group brothers and sisters to unify family contact records and offer consolidated family monthly fee plans.', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B))),
+                    ],
+                  ),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () => _showCreateGroupModal(provider),
+                  icon: const Icon(Icons.group_add_rounded, size: 16),
+                  label: const Text('Create Sibling Group', style: TextStyle(fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12)),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+
+          // Search Bar
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
+            child: TextField(
+              controller: _groupSearchCtrl,
+              decoration: const InputDecoration(
+                hintText: 'Search sibling group by family name...',
+                border: OutlineInputBorder(),
+                isDense: true,
+                prefixIcon: Icon(Icons.search, size: 18),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Groups Grid
+          if (filtered.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(40),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
+              child: Column(
+                children: [
+                  Icon(Icons.family_restroom_rounded, size: 48, color: Colors.grey.shade400),
+                  const SizedBox(height: 12),
+                  const Text('No sibling groups created yet. Click "Create Sibling Group" to bundle brothers and sisters.', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
+                ],
+              ),
+            )
+          else
+            ...filtered.map((g) {
+              final memberStudents = provider.students.where((s) => g.memberStudentIds.contains(s.id)).toList();
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: const [BoxShadow(color: Color(0x060F172A), blurRadius: 6, offset: Offset(0, 2))],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 18,
+                              backgroundColor: const Color(0xFFEFF6FF),
+                              child: const Icon(Icons.family_restroom_rounded, color: Color(0xFF2563EB), size: 18),
+                            ),
+                            const SizedBox(width: 12),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(g.name, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14.5, color: Color(0xFF0F172A))),
+                                Text('${memberStudents.length} Sibling Members Enrolled', style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
+                              ],
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFBFDBFE))),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              const Text('CONSOLIDATED MONTHLY FEE', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF1E40AF))),
+                              Text('₹${g.monthlyFee.toStringAsFixed(0)}/mo', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Color(0xFF2563EB))),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 20),
+
+                    // Member Chips Wrap
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: memberStudents.map((s) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(s.name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(4)),
+                                child: Text('Class ${s.studentClass}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Actions Row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            if (memberStudents.isEmpty) return;
+                            await provider.unifyFamilyDetails(memberStudents.first.id, memberStudents.map((s) => s.id).toList());
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Unified parent details & address across all siblings successfully!')));
+                            }
+                          },
+                          icon: const Icon(Icons.sync_rounded, size: 15),
+                          label: const Text('Unify Family Details', style: TextStyle(fontSize: 11.5)),
+                          style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF2563EB), side: const BorderSide(color: Color(0xFFBFDBFE))),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF2563EB)),
+                          tooltip: 'Edit Group',
+                          onPressed: () => _showEditStudentGroupModal(g, provider),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFE11D48)),
+                          tooltip: 'Delete Group',
+                          onPressed: () async {
+                            final confirmed = await _confirmAction(
+                              context,
+                              title: 'Delete Sibling Group',
+                              message: 'Are you sure you want to permanently disband sibling group "${g.name}"?',
+                              confirmLabel: 'Disband Group',
+                              confirmColor: const Color(0xFFE11D48),
+                            );
+                            if (confirmed) {
+                              await provider.deleteStudentGroup(g.id);
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Sibling Group "${g.name}" deleted.')));
+                              }
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
+  void _showCreateGroupModal(InstitutionProvider provider) {
+    final nameCtrl = TextEditingController(text: 'Family Group');
+    final feeCtrl = TextEditingController(text: '800');
+    final selectedIds = <String>{};
+    String filterClass = 'ALL';
+    final searchCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) {
+          final query = searchCtrl.text.trim().toLowerCase();
+          final matchingStudents = provider.activeStudents.where((s) {
+            if (filterClass != 'ALL' && s.studentClass != filterClass) return false;
+            if (query.isNotEmpty) {
+              return s.name.toLowerCase().contains(query) || s.adm.toLowerCase().contains(query) || s.father.toLowerCase().contains(query);
+            }
+            return true;
+          }).toList();
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text('Create Student Sibling Group', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+            content: SizedBox(
+              width: 520,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(child: TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Group Name *', border: OutlineInputBorder(), isDense: true))),
+                        const SizedBox(width: 10),
+                        Expanded(child: TextField(controller: feeCtrl, decoration: const InputDecoration(labelText: 'Consolidated Monthly Fee (₹) *', border: OutlineInputBorder(), isDense: true), keyboardType: TextInputType.number)),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Filter row
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: filterClass,
+                            decoration: const InputDecoration(labelText: 'Filter Class', border: OutlineInputBorder(), isDense: true),
+                            items: ['ALL', ...provider.classes].map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12)))).toList(),
+                            onChanged: (v) => setDlg(() => filterClass = v ?? 'ALL'),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          flex: 2,
+                          child: TextField(
+                            controller: searchCtrl,
+                            decoration: const InputDecoration(labelText: 'Search Sibling (Name/Adm/Father)', border: OutlineInputBorder(), isDense: true, prefixIcon: Icon(Icons.search, size: 16)),
+                            onChanged: (_) => setDlg(() {}),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
+                    Text('Selected: ${selectedIds.length} Sibling Members (Select minimum 2)', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
+                    const SizedBox(height: 6),
+
+                    Container(
+                      height: 220,
+                      decoration: BoxDecoration(border: Border.all(color: const Color(0xFFCBD5E1)), borderRadius: BorderRadius.circular(10)),
+                      child: ListView.separated(
+                        itemCount: matchingStudents.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (ctx, idx) {
+                          final s = matchingStudents[idx];
+                          final isSel = selectedIds.contains(s.id);
+
+                          return CheckboxListTile(
+                            dense: true,
+                            value: isSel,
+                            activeColor: const Color(0xFF2563EB),
+                            title: Text('${s.name} (#${s.adm})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                            subtitle: Text('Class: ${s.studentClass} • Guardian: ${s.father.isNotEmpty ? s.father : 'N/A'} • Ph: ${s.mobile}'),
+                            onChanged: (v) {
+                              setDlg(() {
+                                if (v == true) {
+                                  selectedIds.add(s.id);
+                                } else {
+                                  selectedIds.remove(s.id);
+                                }
+                              });
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
+                onPressed: () async {
+                  if (selectedIds.length < 2) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select at least 2 sibling students!')));
+                    return;
+                  }
+                  final fee = double.tryParse(feeCtrl.text.trim()) ?? 800.0;
+                  final group = StudentGroup(
+                    id: 'grp_${DateTime.now().millisecondsSinceEpoch}',
+                    name: nameCtrl.text.trim().isNotEmpty ? nameCtrl.text.trim() : 'Family Group',
+                    monthlyFee: fee,
+                    memberStudentIds: selectedIds.toList(),
+                  );
+                  await provider.saveStudentGroup(group);
+                  await provider.unifyFamilyDetails(selectedIds.first, selectedIds.toList());
+                  if (mounted) {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Sibling Group "${group.name}" created and contact details unified!')));
+                    setState(() {});
+                  }
+                },
+                icon: const Icon(Icons.check, size: 16),
+                label: const Text('Create & Unify Details'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -5450,41 +6201,47 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDlg) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('Edit Sibling Group: ${g.name}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Group Name', border: OutlineInputBorder())),
-                const SizedBox(height: 10),
-                TextField(controller: feeCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Consolidated Monthly Fee (₹)', border: OutlineInputBorder())),
-                const SizedBox(height: 12),
-                const Text('Group Sibling Members:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                const SizedBox(height: 6),
-                SizedBox(
-                  height: 180,
-                  width: double.maxFinite,
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: provider.activeStudents.length,
-                    itemBuilder: (ctx, idx) {
-                      final s = provider.activeStudents[idx];
-                      final isSel = selectedIds.contains(s.id);
-                      return CheckboxListTile(
-                        dense: true,
-                        value: isSel,
-                        title: Text('${s.name} (${s.studentClass})', style: const TextStyle(fontSize: 12)),
-                        onChanged: (v) {
-                          setDlg(() {
-                            if (v == true) selectedIds.add(s.id); else selectedIds.remove(s.id);
-                          });
-                        },
-                      );
-                    },
+          title: Text('Edit Sibling Group: ${g.name}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          content: SizedBox(
+            width: 480,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Group Name *', border: OutlineInputBorder(), isDense: true)),
+                  const SizedBox(height: 10),
+                  TextField(controller: feeCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Consolidated Monthly Fee (₹) *', border: OutlineInputBorder(), isDense: true)),
+                  const SizedBox(height: 12),
+                  const Text('Group Sibling Members:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                  const SizedBox(height: 6),
+                  Container(
+                    height: 200,
+                    decoration: BoxDecoration(border: Border.all(color: const Color(0xFFCBD5E1)), borderRadius: BorderRadius.circular(10)),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: provider.activeStudents.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (ctx, idx) {
+                        final s = provider.activeStudents[idx];
+                        final isSel = selectedIds.contains(s.id);
+                        return CheckboxListTile(
+                          dense: true,
+                          value: isSel,
+                          activeColor: const Color(0xFF2563EB),
+                          title: Text('${s.name} (#${s.adm})', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          subtitle: Text('Class ${s.studentClass} • Guardian: ${s.father}'),
+                          onChanged: (v) {
+                            setDlg(() {
+                              if (v == true) selectedIds.add(s.id); else selectedIds.remove(s.id);
+                            });
+                          },
+                        );
+                      },
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           actions: [
@@ -5499,8 +6256,11 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                   memberStudentIds: selectedIds.toList(),
                 );
                 await provider.saveStudentGroup(updated);
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Sibling Group "${updated.name}" updated!')));
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Sibling Group "${updated.name}" updated!')));
+                  setState(() {});
+                }
               },
               child: const Text('Save Changes'),
             ),
@@ -5510,113 +6270,455 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
     );
   }
 
+  // ========================================================================
   // 4D. FEE CONCESSIONS
+  // ========================================================================
   Widget _buildFeeConcessionsTab(InstitutionProvider provider) {
-    return ListView(
+    final concessions = provider.concessions;
+    final defaultMonthlyFee = provider.setting.defaultMonthlyFee;
+    final totalMonthlyDiscount = concessions.fold(0.0, (acc, c) {
+      final diff = (defaultMonthlyFee - c.concessionMonthlyFee).clamp(0.0, 999999.0);
+      return acc + diff;
+    });
+
+    final q = _activeConcSearchCtrl.text.trim().toLowerCase();
+    final filteredConcessions = concessions.where((c) {
+      if (_activeConcClassFilter != null && _activeConcClassFilter != 'ALL' && c.studentClass != _activeConcClassFilter) return false;
+      if (q.isNotEmpty) {
+        return c.studentName.toLowerCase().contains(q) || c.reason.toLowerCase().contains(q);
+      }
+      return true;
+    }).toList();
+
+    // Student candidates for assigning new concession
+    final assignQ = _concSearchCtrl.text.trim().toLowerCase();
+    final matchingCandidates = provider.activeStudents.where((s) {
+      if (_concClassFilter != null && _concClassFilter != 'ALL' && s.studentClass != _concClassFilter) return false;
+      if (assignQ.isNotEmpty) {
+        return s.name.toLowerCase().contains(assignQ) || s.adm.toLowerCase().contains(assignQ);
+      }
+      return true;
+    }).toList();
+
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('Active Concessions (${provider.concessions.length})', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-            ElevatedButton.icon(
-              onPressed: () => _showAddConcessionModal(provider),
-              icon: const Icon(Icons.add, size: 16),
-              label: const Text('Assign Concession'),
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF059669), foregroundColor: Colors.white),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Card
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 10, offset: Offset(0, 4))],
             ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        if (provider.concessions.isEmpty)
-          const Center(child: Padding(padding: EdgeInsets.all(30), child: Text('No special fee concessions assigned.')))
-        else
-          ...provider.concessions.map((c) => Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFE2E8F0))),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(c.studentName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                    Text('Class: ${c.studentClass} • Special Fee: ₹${c.concessionMonthlyFee.toStringAsFixed(0)}/month', style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
-                  ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('SPECIAL ASSISTANCE & SCHOLARSHIPS', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Color(0xFF64748B), letterSpacing: 1.2)),
+                      const SizedBox(height: 4),
+                      const Text('Fee Concessions & Scholarship Management', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+                      const SizedBox(height: 4),
+                      const Text('Assign individualized discounted monthly tuition fees to eligible students (Orphan, BPL, Staff Child, Merit, Multi-sibling).', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B))),
+                    ],
+                  ),
                 ),
                 Row(
                   children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF2563EB)),
-                      tooltip: 'Edit Concession',
-                      onPressed: () => _showEditConcessionModal(c, provider),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFA7F3D0))),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          const Text('ACTIVE CONCESSIONS', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF065F46))),
+                          const SizedBox(height: 2),
+                          Text('${concessions.length}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFF059669))),
+                        ],
+                      ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                      tooltip: 'Cancel Concession',
-                      onPressed: () async {
-                        final confirmed = await _confirmAction(
-                          context,
-                          title: 'Cancel Fee Concession',
-                          message: 'Are you sure you want to cancel the special fee concession for "${c.studentName}"?',
-                          confirmLabel: 'Cancel Concession',
-                        );
-                        if (confirmed) {
-                          await provider.removeConcession(c.studentId);
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Concession for "${c.studentName}" cancelled.')));
-                        }
-                      },
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFBFDBFE))),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          const Text('MONTHLY SAVINGS', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF1E40AF))),
+                          const SizedBox(height: 2),
+                          Text('₹${totalMonthlyDiscount.toStringAsFixed(0)}/mo', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFF2563EB))),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ],
             ),
-          )),
-      ],
-    );
-  }
+          ),
+          const SizedBox(height: 18),
 
-  void _showAddConcessionModal(InstitutionProvider provider) {
-    Student? selStudent;
-    final feeCtrl = TextEditingController(text: '200');
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDlg) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Assign Fee Concession', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
+          // Two-Column Responsive Workstation Layout
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              DropdownButtonFormField<Student>(
-                decoration: const InputDecoration(labelText: 'Select Student', border: OutlineInputBorder()),
-                items: provider.activeStudents.map((s) => DropdownMenuItem(value: s, child: Text('${s.name} (${s.studentClass})', style: const TextStyle(fontSize: 12)))).toList(),
-                onChanged: (s) => setDlg(() => selStudent = s),
+              // Left Column: Find & Assign Concession
+              Expanded(
+                flex: 5,
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 10, offset: Offset(0, 4))],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF2563EB), shape: BoxShape.circle)),
+                          const SizedBox(width: 8),
+                          const Text('Find & Assign Concession', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                        ],
+                      ),
+                      const Divider(height: 20),
+
+                      // Filter Row
+                      Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              value: _concClassFilter ?? 'ALL',
+                              decoration: const InputDecoration(labelText: 'Filter Class', border: OutlineInputBorder(), isDense: true),
+                              items: ['ALL', ...provider.classes].map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12)))).toList(),
+                              onChanged: (v) => setState(() => _concClassFilter = v),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            flex: 2,
+                            child: TextField(
+                              controller: _concSearchCtrl,
+                              decoration: InputDecoration(
+                                labelText: 'Search Student',
+                                hintText: 'Name or Adm No...',
+                                border: const OutlineInputBorder(),
+                                isDense: true,
+                                prefixIcon: const Icon(Icons.search, size: 16),
+                                suffixIcon: _concSelectedStudent != null
+                                    ? IconButton(
+                                        icon: const Icon(Icons.clear, size: 16),
+                                        onPressed: () => setState(() {
+                                          _concSelectedStudent = null;
+                                          _concSearchCtrl.clear();
+                                        }),
+                                      )
+                                    : null,
+                              ),
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Suggestions List
+                      if (_concSelectedStudent == null && assignQ.isNotEmpty) ...[
+                        Container(
+                          constraints: const BoxConstraints(maxHeight: 180),
+                          decoration: BoxDecoration(border: Border.all(color: const Color(0xFFCBD5E1)), borderRadius: BorderRadius.circular(10), color: const Color(0xFFF8FAFC)),
+                          child: ListView.separated(
+                            shrinkWrap: true,
+                            itemCount: matchingCandidates.take(6).length,
+                            separatorBuilder: (_, __) => const Divider(height: 1),
+                            itemBuilder: (ctx, idx) {
+                              final s = matchingCandidates[idx];
+                              return ListTile(
+                                dense: true,
+                                title: Text('${s.name} (#${s.adm})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                                subtitle: Text('Class: ${s.studentClass} • Guardian: ${s.father}'),
+                                trailing: const Icon(Icons.arrow_forward_ios, size: 12),
+                                onTap: () {
+                                  setState(() {
+                                    _concSelectedStudent = s;
+                                    _concSearchCtrl.text = '${s.name} (#${s.adm})';
+                                  });
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+
+                      // Selected Student Assignment Box
+                      if (_concSelectedStudent != null) ...[
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFBFDBFE))),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 16,
+                                    backgroundColor: const Color(0xFF2563EB),
+                                    child: Text(_concSelectedStudent!.name.isNotEmpty ? _concSelectedStudent!.name[0].toUpperCase() : '?', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(_concSelectedStudent!.name, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5, color: Color(0xFF1E3A8A))),
+                                        Text('Adm: #${_concSelectedStudent!.adm} • Class: ${_concSelectedStudent!.studentClass}', style: const TextStyle(fontSize: 11, color: Color(0xFF1E40AF))),
+                                      ],
+                                    ),
+                                  ),
+                                  Text('Base: ₹${defaultMonthlyFee.toStringAsFixed(0)}', style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF1E40AF))),
+                                ],
+                              ),
+                              const Divider(height: 18, color: Color(0xFFBFDBFE)),
+
+                              TextField(
+                                controller: _concAmountCtrl,
+                                decoration: const InputDecoration(labelText: 'Special Concession Monthly Fee (₹) *', border: OutlineInputBorder(), isDense: true, prefixIcon: Icon(Icons.currency_rupee_rounded, size: 16)),
+                                keyboardType: TextInputType.number,
+                              ),
+                              const SizedBox(height: 10),
+
+                              DropdownButtonFormField<String>(
+                                value: ['Orphan / Yatheem', 'BPL / Financial Aid', 'Staff Child', 'Madrasa Scholar', 'Multi-sibling Discount', 'Other'].contains(_concReasonCtrl.text)
+                                    ? _concReasonCtrl.text
+                                    : 'BPL / Financial Aid',
+                                decoration: const InputDecoration(labelText: 'Reason / Category *', border: OutlineInputBorder(), isDense: true),
+                                items: ['Orphan / Yatheem', 'BPL / Financial Aid', 'Staff Child', 'Madrasa Scholar', 'Multi-sibling Discount', 'Other']
+                                    .map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 12.5))))
+                                    .toList(),
+                                onChanged: (v) => setState(() => _concReasonCtrl.text = v ?? 'BPL / Financial Aid'),
+                              ),
+                              const SizedBox(height: 14),
+
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: ElevatedButton.icon(
+                                  onPressed: () async {
+                                    final amt = double.tryParse(_concAmountCtrl.text.trim()) ?? 200.0;
+                                    final conc = FeeConcession(
+                                      studentId: _concSelectedStudent!.id,
+                                      studentName: _concSelectedStudent!.name,
+                                      studentClass: _concSelectedStudent!.studentClass,
+                                      concessionMonthlyFee: amt,
+                                      reason: _concReasonCtrl.text.trim(),
+                                    );
+                                    await provider.saveConcession(conc);
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Concession assigned to ${_concSelectedStudent!.name} at ₹${amt.toStringAsFixed(0)}/month.'),
+                                          backgroundColor: const Color(0xFF059669),
+                                        ),
+                                      );
+                                      setState(() {
+                                        _concSelectedStudent = null;
+                                        _concSearchCtrl.clear();
+                                      });
+                                    }
+                                  },
+                                  icon: const Icon(Icons.save_rounded, size: 16),
+                                  label: const Text('Save Concession', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF059669), foregroundColor: Colors.white),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ] else ...[
+                        Container(
+                          padding: const EdgeInsets.all(24),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFE2E8F0))),
+                          child: const Text('Select a class or type student name above to assign a concession.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
               ),
-              const SizedBox(height: 10),
-              TextField(controller: feeCtrl, decoration: const InputDecoration(labelText: 'Special Monthly Fee (₹)', border: OutlineInputBorder())),
+              const SizedBox(width: 18),
+
+              // Right Column: Active Concessions Directory
+              Expanded(
+                flex: 7,
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 10, offset: Offset(0, 4))],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF059669), shape: BoxShape.circle)),
+                              const SizedBox(width: 8),
+                              const Text('Active Concessions Directory', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                            ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(6)),
+                            child: Text('${filteredConcessions.length} Students', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF047857))),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 20),
+
+                      // Filter Bar
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _activeConcSearchCtrl,
+                              decoration: const InputDecoration(hintText: 'Filter active by student name...', border: OutlineInputBorder(), isDense: true, prefixIcon: Icon(Icons.search, size: 16)),
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          SizedBox(
+                            width: 160,
+                            child: DropdownButtonFormField<String>(
+                              value: _activeConcClassFilter ?? 'ALL',
+                              decoration: const InputDecoration(labelText: 'Class', border: OutlineInputBorder(), isDense: true),
+                              items: ['ALL', ...provider.classes].map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12)))).toList(),
+                              onChanged: (v) => setState(() => _activeConcClassFilter = v),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Concession Cards Grid
+                      if (filteredConcessions.isEmpty)
+                        Container(
+                          padding: const EdgeInsets.all(32),
+                          alignment: Alignment.center,
+                          child: Column(
+                            children: [
+                              Icon(Icons.percent_rounded, size: 40, color: Colors.grey.shade400),
+                              const SizedBox(height: 8),
+                              const Text('No active fee concessions match your filters.', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+                            ],
+                          ),
+                        )
+                      else
+                        ...filteredConcessions.map((c) {
+                          final diff = (defaultMonthlyFee - c.concessionMonthlyFee).clamp(0.0, 999999.0);
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                              boxShadow: const [BoxShadow(color: Color(0x060F172A), blurRadius: 6, offset: Offset(0, 2))],
+                            ),
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 18,
+                                  backgroundColor: const Color(0xFFECFDF5),
+                                  child: const Icon(Icons.percent_rounded, color: Color(0xFF059669), size: 16),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Text(c.studentName, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5, color: Color(0xFF0F172A))),
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                            decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(4)),
+                                            child: Text('Class ${c.studentClass}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          if (c.reason.isNotEmpty)
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                              decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(4)),
+                                              child: Text(c.reason, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF1E40AF))),
+                                            ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          Text('Fee: ₹${c.concessionMonthlyFee.toStringAsFixed(0)}/mo', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900, color: Color(0xFF059669))),
+                                          const SizedBox(width: 8),
+                                          Text('(Save ₹${diff.toStringAsFixed(0)} off ₹${defaultMonthlyFee.toStringAsFixed(0)})', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Row(
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF2563EB)),
+                                      tooltip: 'Edit Concession',
+                                      onPressed: () => _showEditConcessionModal(c, provider),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFE11D48)),
+                                      tooltip: 'Cancel Concession',
+                                      onPressed: () async {
+                                        final confirmed = await _confirmAction(
+                                          context,
+                                          title: 'Cancel Fee Concession',
+                                          message: 'Are you sure you want to cancel the special fee concession for "${c.studentName}"? Standard monthly fee will resume.',
+                                          confirmLabel: 'Cancel Concession',
+                                          confirmColor: const Color(0xFFE11D48),
+                                        );
+                                        if (confirmed) {
+                                          await provider.removeConcession(c.studentId);
+                                          if (mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Concession for "${c.studentName}" removed.')));
+                                            setState(() {});
+                                          }
+                                        }
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: () {
-                if (selStudent == null) return;
-                final conc = FeeConcession(
-                  studentId: selStudent!.id,
-                  studentName: selStudent!.name,
-                  studentClass: selStudent!.studentClass,
-                  concessionMonthlyFee: double.tryParse(feeCtrl.text) ?? 200.0,
-                );
-                provider.saveConcession(conc);
-                Navigator.pop(ctx);
-              },
-              child: const Text('Save Concession'),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -5629,14 +6731,20 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Edit Concession: ${c.studentName}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: feeCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Concession Monthly Fee (₹)', border: OutlineInputBorder())),
-            const SizedBox(height: 10),
-            TextField(controller: reasonCtrl, decoration: const InputDecoration(labelText: 'Reason / Remarks', border: OutlineInputBorder())),
-          ],
+        title: Text('Edit Concession: ${c.studentName}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        content: SizedBox(
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Class: ${c.studentClass}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+              const SizedBox(height: 12),
+              TextField(controller: feeCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Special Monthly Fee (₹) *', border: OutlineInputBorder(), isDense: true)),
+              const SizedBox(height: 10),
+              TextField(controller: reasonCtrl, decoration: const InputDecoration(labelText: 'Reason / Remarks *', border: OutlineInputBorder(), isDense: true)),
+            ],
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
@@ -5652,8 +6760,11 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                 reason: reasonCtrl.text.trim(),
               );
               await provider.saveConcession(updated);
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Concession for "${c.studentName}" updated!')));
+              if (mounted) {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Concession for "${c.studentName}" updated!')));
+                setState(() {});
+              }
             },
             child: const Text('Save Changes'),
           ),
