@@ -206,14 +206,15 @@ class _AdaptivePortalScaffoldState extends State<AdaptivePortalScaffold> {
     }
 
     if (isDesktop) {
-      return _buildDesktopLayout(context, setting);
+      return _buildDesktopLayout(context, provider);
     } else {
-      return _buildMobileLayout(context, setting);
+      return _buildMobileLayout(context, provider);
     }
   }
 
   // ==================== DESKTOP / LAPTOP LAYOUT ====================
-  Widget _buildDesktopLayout(BuildContext context, dynamic setting) {
+  Widget _buildDesktopLayout(BuildContext context, InstitutionProvider provider) {
+    final setting = provider.setting;
     final currentTab = widget.tabs[_currentTabIndex];
     final activeLeaf = _getActiveLeaf();
     final activeBody = activeLeaf != null
@@ -605,7 +606,8 @@ class _AdaptivePortalScaffoldState extends State<AdaptivePortalScaffold> {
   }
 
   // ==================== MOBILE PHONE LAYOUT ====================
-  Widget _buildMobileLayout(BuildContext context, dynamic setting) {
+  Widget _buildMobileLayout(BuildContext context, InstitutionProvider provider) {
+    final setting = provider.setting;
     final activeLeaf = _getActiveLeaf();
     final activeBody = activeLeaf != null
         ? activeLeaf.body
