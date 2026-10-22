@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import '../../providers/institution_provider.dart';
 import '../../services/navigation_preferences_service.dart';
+import '../../core/routing/app_router.dart';
 
 class PortalSubItem {
   final String id;
@@ -215,6 +217,10 @@ class _AdaptivePortalScaffoldState extends State<AdaptivePortalScaffold> {
   // ==================== DESKTOP / LAPTOP LAYOUT ====================
   Widget _buildDesktopLayout(BuildContext context, InstitutionProvider provider) {
     final setting = provider.setting;
+    final staff = provider.currentStaff;
+    final staffName = staff?.name.isNotEmpty == true ? staff!.name : 'Administrator';
+    final staffRole = staff?.role.isNotEmpty == true ? staff!.role : 'Super Admin';
+
     final currentTab = widget.tabs[_currentTabIndex];
     final activeLeaf = _getActiveLeaf();
     final activeBody = activeLeaf != null
@@ -229,7 +235,7 @@ class _AdaptivePortalScaffoldState extends State<AdaptivePortalScaffold> {
       backgroundColor: const Color(0xFFF8FAFC),
       body: Column(
         children: [
-          // 1. Top Desktop Header (STRICTLY CENTER-ALIGNED BRANDING)
+          // 1. Top Desktop Header (Dynamic Sidebar Tracking & Center Branding)
           Container(
             height: 64,
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -239,49 +245,16 @@ class _AdaptivePortalScaffoldState extends State<AdaptivePortalScaffold> {
             ),
             child: Row(
               children: [
-                // Left: Sidebar Toggle + Portal Tag
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      tooltip: _isSidebarExpanded ? 'Collapse Sidebar' : 'Expand Sidebar',
-                      icon: Icon(
-                        _isSidebarExpanded ? Icons.menu_open_rounded : Icons.menu_rounded,
-                        color: const Color(0xFF1E293B),
-                        size: 24,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _isSidebarExpanded = !_isSidebarExpanded;
-                        });
-                      },
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEFF6FF),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFBFDBFE)),
-                      ),
-                      child: Text(
-                        widget.portalTitle,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1D4ED8),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                // Center: Strictly Center-Aligned Logo + School Name + Active Breadcrumb
-                Expanded(
-                  child: Center(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
+                // Left: Dynamic Animated Container tracking Sidebar width
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeInOut,
+                  width: _isSidebarExpanded ? 260 : 72,
+                  child: Row(
+                    mainAxisAlignment: _isSidebarExpanded ? MainAxisAlignment.spaceBetween : MainAxisAlignment.center,
+                    children: [
+                      if (_isSidebarExpanded) ...[
+                        // Logo at left corner
                         Container(
                           width: 36,
                           height: 36,
@@ -297,7 +270,64 @@ class _AdaptivePortalScaffoldState extends State<AdaptivePortalScaffold> {
                             errorBuilder: (_, __, ___) => const Icon(Icons.school, size: 20, color: Color(0xFF2563EB)),
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        // Collapse button positioned at the right edge of the 260px boundary
+                        IconButton(
+                          tooltip: 'Collapse Sidebar',
+                          icon: const Icon(
+                            Icons.menu_open_rounded,
+                            color: Color(0xFF1E293B),
+                            size: 24,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _isSidebarExpanded = false;
+                            });
+                          },
+                        ),
+                      ] else ...[
+                        // When collapsed, center the expand toggle button right above the slim 72px rail
+                        IconButton(
+                          tooltip: 'Expand Sidebar',
+                          icon: const Icon(
+                            Icons.menu_rounded,
+                            color: Color(0xFF1E293B),
+                            size: 24,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _isSidebarExpanded = true;
+                            });
+                          },
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+
+                // Center: Strictly Center-Aligned School Name + Active Breadcrumb
+                Expanded(
+                  child: Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (!_isSidebarExpanded) ...[
+                          Container(
+                            width: 32,
+                            height: 32,
+                            margin: const EdgeInsets.only(right: 10),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: const Color(0xFFCBD5E1)),
+                              color: Colors.white,
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: Image.asset(
+                              'assets/images/logo.png',
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(Icons.school, size: 18, color: Color(0xFF2563EB)),
+                            ),
+                          ),
+                        ],
                         Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.center,
@@ -330,7 +360,7 @@ class _AdaptivePortalScaffoldState extends State<AdaptivePortalScaffold> {
                   ),
                 ),
 
-                // Right: Actions & Back
+                // Right: Actions, Theme Switch & Profile Dropdown (Replaces Back button)
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -346,15 +376,109 @@ class _AdaptivePortalScaffoldState extends State<AdaptivePortalScaffold> {
                     const SizedBox(width: 4),
                     if (widget.headerActions != null) ...widget.headerActions!,
                     const SizedBox(width: 8),
-                    OutlinedButton.icon(
-                      onPressed: widget.onBack ?? () => Navigator.pop(context),
-                      icon: const Icon(Icons.arrow_back_rounded, size: 16),
-                      label: const Text('Back', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF475569),
-                        side: const BorderSide(color: Color(0xFFCBD5E1)),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+
+                    // Profile Menu with Staff details and Dropdown (Back to Hub + Logout)
+                    PopupMenuButton<String>(
+                      offset: const Offset(0, 48),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: const BorderSide(color: Color(0xFFE2E8F0)),
+                      ),
+                      elevation: 6,
+                      onSelected: (val) {
+                        if (val == 'back') {
+                          if (widget.onBack != null) {
+                            widget.onBack!();
+                          } else if (Navigator.canPop(context)) {
+                            Navigator.pop(context);
+                          } else {
+                            context.go(AppRouter.hub);
+                          }
+                        } else if (val == 'logout') {
+                          provider.logout();
+                          context.go(AppRouter.home);
+                        }
+                      },
+                      itemBuilder: (ctx) => [
+                        PopupMenuItem<String>(
+                          enabled: false,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                staffName,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                              ),
+                              Text(
+                                staffRole,
+                                style: const TextStyle(fontSize: 11, color: Color(0xFF2563EB), fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuDivider(),
+                        const PopupMenuItem<String>(
+                          value: 'back',
+                          child: Row(
+                            children: [
+                              Icon(Icons.arrow_back_rounded, size: 18, color: Color(0xFF475569)),
+                              SizedBox(width: 10),
+                              Text('Back to Hub', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem<String>(
+                          value: 'logout',
+                          child: Row(
+                            children: [
+                              Icon(Icons.logout_rounded, size: 18, color: Color(0xFFE11D48)),
+                              SizedBox(width: 10),
+                              Text('Logout', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFFE11D48))),
+                            ],
+                          ),
+                        ),
+                      ],
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            CircleAvatar(
+                              radius: 15,
+                              backgroundColor: const Color(0xFFEFF6FF),
+                              child: Text(
+                                staffName.isNotEmpty ? staffName[0].toUpperCase() : 'A',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1D4ED8)),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  staffName,
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  staffRole,
+                                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF2563EB)),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(width: 6),
+                            const Icon(Icons.arrow_drop_down, size: 18, color: Color(0xFF64748B)),
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -531,38 +655,76 @@ class _AdaptivePortalScaffoldState extends State<AdaptivePortalScaffold> {
                                 );
                               }
                             } else {
-                              // COLLAPSED COMPACT MODE
-                              final isSelected = _currentTabIndex == tIdx;
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 6),
-                                child: Tooltip(
-                                  message: tab.label,
-                                  preferBelow: false,
-                                  child: InkWell(
-                                    onTap: () {
-                                      _selectSubItem(tIdx, 0);
-                                      setState(() => _isSidebarExpanded = true);
-                                    },
-                                    borderRadius: BorderRadius.circular(10),
-                                    child: Container(
-                                      width: 48,
-                                      height: 44,
-                                      decoration: BoxDecoration(
-                                        color: isSelected ? const Color(0xFFEFF6FF) : Colors.transparent,
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: isSelected ? Border.all(color: const Color(0xFFBFDBFE)) : null,
-                                      ),
-                                      child: Center(
-                                        child: Icon(
-                                          tab.icon,
-                                          size: 22,
-                                          color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                              // COLLAPSED COMPACT MODE (1-Tap Direct Subtab Activation, No Forced Expansion)
+                              if (tab.hasSubItems) {
+                                return Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    ...List.generate(tab.subItems.length, (sIdx) {
+                                      final sub = tab.subItems[sIdx];
+                                      final isSelected = _currentTabIndex == tIdx && _currentSubIndex == sIdx;
+                                      return Padding(
+                                        padding: const EdgeInsets.only(bottom: 4),
+                                        child: Tooltip(
+                                          message: '${tab.label} • ${sub.label}',
+                                          preferBelow: false,
+                                          child: InkWell(
+                                            onTap: () => _selectSubItem(tIdx, sIdx),
+                                            borderRadius: BorderRadius.circular(8),
+                                            child: Container(
+                                              width: 44,
+                                              height: 40,
+                                              decoration: BoxDecoration(
+                                                color: isSelected ? const Color(0xFFEFF6FF) : Colors.transparent,
+                                                borderRadius: BorderRadius.circular(8),
+                                                border: isSelected ? Border.all(color: const Color(0xFFBFDBFE)) : null,
+                                              ),
+                                              child: Center(
+                                                child: Icon(
+                                                  sub.icon,
+                                                  size: 19,
+                                                  color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }),
+                                    if (tIdx < widget.tabs.length - 1)
+                                      const Divider(height: 12, indent: 14, endIndent: 14, color: Color(0xFFE2E8F0)),
+                                  ],
+                                );
+                              } else {
+                                final isSelected = _currentTabIndex == tIdx;
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 6),
+                                  child: Tooltip(
+                                    message: tab.label,
+                                    preferBelow: false,
+                                    child: InkWell(
+                                      onTap: () => _selectSubItem(tIdx, 0),
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Container(
+                                        width: 44,
+                                        height: 40,
+                                        decoration: BoxDecoration(
+                                          color: isSelected ? const Color(0xFFEFF6FF) : Colors.transparent,
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: isSelected ? Border.all(color: const Color(0xFFBFDBFE)) : null,
+                                        ),
+                                        child: Center(
+                                          child: Icon(
+                                            tab.icon,
+                                            size: 20,
+                                            color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ),
-                                ),
-                              );
+                                );
+                              }
                             }
                           },
                         ),
@@ -608,6 +770,9 @@ class _AdaptivePortalScaffoldState extends State<AdaptivePortalScaffold> {
   // ==================== MOBILE PHONE LAYOUT ====================
   Widget _buildMobileLayout(BuildContext context, InstitutionProvider provider) {
     final setting = provider.setting;
+    final staff = provider.currentStaff;
+    final staffName = staff?.name.isNotEmpty == true ? staff!.name : 'Administrator';
+    final staffRole = staff?.role.isNotEmpty == true ? staff!.role : 'Super Admin';
     final activeLeaf = _getActiveLeaf();
     final activeBody = activeLeaf != null
         ? activeLeaf.body
@@ -661,6 +826,69 @@ class _AdaptivePortalScaffoldState extends State<AdaptivePortalScaffold> {
               color: provider.isDarkMode ? Colors.amber : const Color(0xFF64748B),
             ),
             onPressed: () => provider.toggleTheme(),
+          ),
+          PopupMenuButton<String>(
+            tooltip: 'Profile & Session',
+            icon: CircleAvatar(
+              radius: 13,
+              backgroundColor: const Color(0xFFEFF6FF),
+              child: Text(
+                staffName.isNotEmpty ? staffName[0].toUpperCase() : 'A',
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1D4ED8)),
+              ),
+            ),
+            offset: const Offset(0, 40),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: Color(0xFFE2E8F0)),
+            ),
+            onSelected: (val) {
+              if (val == 'back') {
+                if (widget.onBack != null) {
+                  widget.onBack!();
+                } else if (Navigator.canPop(context)) {
+                  Navigator.pop(context);
+                } else {
+                  context.go(AppRouter.hub);
+                }
+              } else if (val == 'logout') {
+                provider.logout();
+                context.go(AppRouter.home);
+              }
+            },
+            itemBuilder: (ctx) => [
+              PopupMenuItem<String>(
+                enabled: false,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(staffName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A))),
+                    Text(staffRole, style: const TextStyle(fontSize: 11, color: Color(0xFF2563EB), fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem<String>(
+                value: 'back',
+                child: Row(
+                  children: [
+                    Icon(Icons.arrow_back_rounded, size: 18, color: Color(0xFF475569)),
+                    SizedBox(width: 10),
+                    Text('Back to Hub', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+              const PopupMenuItem<String>(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout_rounded, size: 18, color: Color(0xFFE11D48)),
+                    SizedBox(width: 10),
+                    Text('Logout', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFFE11D48))),
+                  ],
+                ),
+              ),
+            ],
           ),
           if (widget.headerActions != null) ...widget.headerActions!,
         ],

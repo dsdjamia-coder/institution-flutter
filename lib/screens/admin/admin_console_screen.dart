@@ -462,6 +462,47 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
     );
   }
 
+  // ==================== UNIVERSAL CONFIRMATION DIALOG ====================
+  Future<bool> _confirmAction(
+    BuildContext context, {
+    required String title,
+    required String message,
+    String confirmLabel = 'Delete',
+    Color confirmColor = const Color(0xFFE11D48),
+  }) async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: confirmColor, size: 24),
+            const SizedBox(width: 10),
+            Expanded(child: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+          ],
+        ),
+        content: Text(message, style: const TextStyle(fontSize: 13, color: Color(0xFF475569))),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: confirmColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(confirmLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
   // 1A. OVERVIEW
   Widget _buildOverviewTab(InstitutionProvider provider, dynamic setting) {
     return SingleChildScrollView(
@@ -678,10 +719,27 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                             onPressed: () => provider.setWorkingAcademicYear(y.label),
                             child: const Text('Set as Current', style: TextStyle(fontSize: 12)),
                           ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF2563EB)),
+                          tooltip: 'Edit Academic Year',
+                          onPressed: () => _showEditAcademicYearModal(y, provider),
+                        ),
                         IconButton(
                           icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                          onPressed: () => provider.deleteAcademicYear(y.label),
+                          tooltip: 'Delete Academic Year',
+                          onPressed: () async {
+                            final confirmed = await _confirmAction(
+                              context,
+                              title: 'Delete Academic Year',
+                              message: 'Are you sure you want to permanently delete academic year "${y.label}"? Enrolled student associations may be affected.',
+                              confirmLabel: 'Delete Year',
+                            );
+                            if (confirmed) {
+                              await provider.deleteAcademicYear(y.label);
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Academic Year "${y.label}" deleted.')));
+                            }
+                          },
                         ),
                       ],
                     ),
@@ -691,6 +749,70 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
             },
           ),
         ],
+      ),
+    );
+  }
+
+  void _showEditAcademicYearModal(AcademicYearConfig y, InstitutionProvider provider) {
+    String startMonth = y.startMonth;
+    String endMonth = y.endMonth;
+    String status = y.status;
+    final months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('Edit Academic Year: ${y.label}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              DropdownButtonFormField<String>(
+                value: months.contains(startMonth) ? startMonth : 'June',
+                decoration: const InputDecoration(labelText: 'Starting Month', border: OutlineInputBorder()),
+                items: months.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                onChanged: (v) => setDlg(() => startMonth = v ?? 'June'),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: months.contains(endMonth) ? endMonth : 'March',
+                decoration: const InputDecoration(labelText: 'Ending Month', border: OutlineInputBorder()),
+                items: months.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                onChanged: (v) => setDlg(() => endMonth = v ?? 'March'),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: status,
+                decoration: const InputDecoration(labelText: 'Status', border: OutlineInputBorder()),
+                items: const [
+                  DropdownMenuItem(value: 'active', child: Text('Active')),
+                  DropdownMenuItem(value: 'archived', child: Text('Archived')),
+                ],
+                onChanged: (v) => setDlg(() => status = v ?? 'active'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
+              onPressed: () async {
+                final updated = AcademicYearConfig(
+                  label: y.label,
+                  startMonth: startMonth,
+                  endMonth: endMonth,
+                  status: status,
+                );
+                await provider.addAcademicYear(updated);
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Academic Year "${y.label}" updated!')));
+              },
+              child: const Text('Save Changes'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -751,18 +873,123 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.assignment_ind_rounded, size: 18, color: Color(0xFF2563EB)),
+                  icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF2563EB)),
+                  tooltip: 'Edit Profile & Access',
+                  onPressed: () => _showEditStaffModal(st, provider),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.assignment_ind_rounded, size: 18, color: Color(0xFF059669)),
                   tooltip: 'Assign Duty Classes & UPI Account',
                   onPressed: () => _showDutyModal(st, provider),
                 ),
                 IconButton(
                   icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                  onPressed: () => provider.deleteStaff(st.id),
+                  tooltip: 'Delete Staff Member',
+                  onPressed: () async {
+                    final confirmed = await _confirmAction(
+                      context,
+                      title: 'Delete Staff Member',
+                      message: 'Are you sure you want to permanently remove faculty member "${st.name}"? Their login sessions and portal access will be revoked.',
+                      confirmLabel: 'Delete Staff',
+                    );
+                    if (confirmed) {
+                      await provider.deleteStaff(st.id);
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Staff "${st.name}" deleted.')));
+                    }
+                  },
                 ),
               ],
             ),
           )),
       ],
+    );
+  }
+
+  void _showEditStaffModal(Staff st, InstitutionProvider provider) {
+    final nameCtrl = TextEditingController(text: st.name);
+    final desigCtrl = TextEditingController(text: st.designation);
+    final samasthaCtrl = TextEditingController(text: st.samasthaRegNo);
+    final phoneCtrl = TextEditingController(text: st.phone);
+    final emailCtrl = TextEditingController(text: st.email);
+    String role = st.role;
+    bool canCollect = st.hasCollectionAccess;
+    bool canWorksheet = st.hasWorksheetAccess;
+    bool canResults = st.hasResultAccess;
+    bool canAdmin = st.hasAdminAccess;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('Edit Staff: ${st.name}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Full Name *', border: OutlineInputBorder())),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  value: ['TEACHER', 'ADMIN', 'COLLECTOR'].contains(role) ? role : 'TEACHER',
+                  decoration: const InputDecoration(labelText: 'Staff Role *', border: OutlineInputBorder()),
+                  items: const [
+                    DropdownMenuItem(value: 'TEACHER', child: Text('Teacher / Ustad')),
+                    DropdownMenuItem(value: 'ADMIN', child: Text('Administrator')),
+                    DropdownMenuItem(value: 'COLLECTOR', child: Text('Cashier / Fee Collector')),
+                  ],
+                  onChanged: (val) => setLocal(() => role = val ?? 'TEACHER'),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(child: TextField(controller: desigCtrl, decoration: const InputDecoration(labelText: 'Designation', border: OutlineInputBorder()))),
+                    const SizedBox(width: 8),
+                    Expanded(child: TextField(controller: samasthaCtrl, decoration: const InputDecoration(labelText: 'Samastha Reg #', border: OutlineInputBorder()))),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                TextField(controller: phoneCtrl, decoration: const InputDecoration(labelText: 'Phone / WhatsApp', border: OutlineInputBorder())),
+                const SizedBox(height: 10),
+                TextField(controller: emailCtrl, decoration: const InputDecoration(labelText: 'Email Address', border: OutlineInputBorder())),
+                const SizedBox(height: 16),
+
+                const Text('4-Portal Access Permissions', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
+                const SizedBox(height: 6),
+                CheckboxListTile(value: canCollect, onChanged: (v) => setLocal(() => canCollect = v ?? true), title: const Text('Fee Collection Access', style: TextStyle(fontSize: 12))),
+                CheckboxListTile(value: canWorksheet, onChanged: (v) => setLocal(() => canWorksheet = v ?? true), title: const Text('Worksheet Access', style: TextStyle(fontSize: 12))),
+                CheckboxListTile(value: canResults, onChanged: (v) => setLocal(() => canResults = v ?? false), title: const Text('Results Access', style: TextStyle(fontSize: 12))),
+                CheckboxListTile(value: canAdmin, onChanged: (v) => setLocal(() => canAdmin = v ?? false), title: const Text('Admin Panel Access', style: TextStyle(fontSize: 12))),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
+              onPressed: () async {
+                if (nameCtrl.text.trim().isEmpty) return;
+                final updated = st.copyWith(
+                  name: nameCtrl.text.trim(),
+                  role: role,
+                  designation: desigCtrl.text.trim(),
+                  samasthaRegNo: samasthaCtrl.text.trim(),
+                  phone: phoneCtrl.text.trim(),
+                  email: emailCtrl.text.trim(),
+                  hasCollectionAccess: canCollect,
+                  hasWorksheetAccess: canWorksheet,
+                  hasResultAccess: canResults,
+                  hasAdminAccess: canAdmin,
+                );
+                await provider.updateStaff(updated);
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Staff "${updated.name}" updated successfully!')));
+              },
+              child: const Text('Save Changes'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -960,114 +1187,135 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
       return true;
     }).toList();
 
-    return Column(
-      children: [
-        // Filter Header
-        Container(
-          padding: const EdgeInsets.all(14),
-          color: Colors.white,
-          child: Row(
-            children: [
-              Expanded(
-                flex: 2,
-                child: TextField(
-                  controller: _studentSearchCtrl,
-                  decoration: const InputDecoration(hintText: 'Search Name, Adm #...', prefixIcon: Icon(Icons.search, size: 18), border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
-                  onChanged: (_) => setState(() {}),
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          // Filter Header Card
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: TextField(
+                    controller: _studentSearchCtrl,
+                    decoration: const InputDecoration(hintText: 'Search Name, Adm #...', prefixIcon: Icon(Icons.search, size: 18), border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                    onChanged: (_) => setState(() {}),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  value: _filterClass,
-                  decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
-                  items: ['ALL', ...provider.classes].map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12)))).toList(),
-                  onChanged: (v) => setState(() => _filterClass = v ?? 'ALL'),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: _filterClass,
+                    decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                    items: ['ALL', ...provider.classes].map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12)))).toList(),
+                    onChanged: (v) => setState(() => _filterClass = v ?? 'ALL'),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  value: _filterStatus,
-                  decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
-                  items: const [
-                    DropdownMenuItem(value: 'ALL', child: Text('All Status', style: TextStyle(fontSize: 12))),
-                    DropdownMenuItem(value: 'Active', child: Text('Active', style: TextStyle(fontSize: 12))),
-                    DropdownMenuItem(value: 'Alumni', child: Text('Alumni', style: TextStyle(fontSize: 12))),
-                    DropdownMenuItem(value: 'Discontinued', child: Text('Exit', style: TextStyle(fontSize: 12))),
-                  ],
-                  onChanged: (v) => setState(() => _filterStatus = v ?? 'ALL'),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: _filterStatus,
+                    decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                    items: const [
+                      DropdownMenuItem(value: 'ALL', child: Text('All Status', style: TextStyle(fontSize: 12))),
+                      DropdownMenuItem(value: 'Active', child: Text('Active', style: TextStyle(fontSize: 12))),
+                      DropdownMenuItem(value: 'Alumni', child: Text('Alumni', style: TextStyle(fontSize: 12))),
+                      DropdownMenuItem(value: 'Discontinued', child: Text('Exit', style: TextStyle(fontSize: 12))),
+                    ],
+                    onChanged: (v) => setState(() => _filterStatus = v ?? 'ALL'),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+          const SizedBox(height: 14),
 
-        // Students Table / List
-        Expanded(
-          child: filtered.isEmpty
-              ? const Center(child: Text('No students matching selected filters.'))
-              : ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: filtered.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (ctx, idx) {
-                    final s = filtered[idx];
-                    return Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFE2E8F0))),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 18,
-                            backgroundColor: Colors.blue.shade50,
-                            child: Text(s.name.isNotEmpty ? s.name[0] : 'S', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue.shade800)),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Text(s.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                    const SizedBox(width: 6),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(4)),
-                                      child: Text('#${s.adm}', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: s.status == 'Active' ? const Color(0xFFECFDF5) : (s.status == 'Alumni' ? const Color(0xFFFAF5FF) : const Color(0xFFFFF1F2)),
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: Text(s.status, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: s.status == 'Active' ? const Color(0xFF065F46) : const Color(0xFF6B21A8))),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 2),
-                                Text('Class: ${s.studentClass} • Father: ${s.father} • Ph: ${s.mobile}', style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
-                              ],
+          // Students Table / List
+          Expanded(
+            child: filtered.isEmpty
+                ? const Center(child: Text('No students matching selected filters.'))
+                : ListView.separated(
+                    padding: EdgeInsets.zero,
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (ctx, idx) {
+                      final s = filtered[idx];
+                      return Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFE2E8F0))),
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 18,
+                              backgroundColor: Colors.blue.shade50,
+                              child: Text(s.name.isNotEmpty ? s.name[0] : 'S', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue.shade800)),
                             ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF2563EB)),
-                            onPressed: () => _showEditStudentModal(s, provider),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                            onPressed: () => provider.deleteStudent(s.id),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-        ),
-      ],
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(s.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(4)),
+                                        child: Text('#${s.adm}', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: s.status == 'Active' ? const Color(0xFFECFDF5) : (s.status == 'Alumni' ? const Color(0xFFFAF5FF) : const Color(0xFFFFF1F2)),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(s.status, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: s.status == 'Active' ? const Color(0xFF065F46) : const Color(0xFF6B21A8))),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text('Class: ${s.studentClass} • Father: ${s.father} • Ph: ${s.mobile}', style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF2563EB)),
+                              tooltip: 'Edit Student Details',
+                              onPressed: () => _showEditStudentModal(s, provider),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                              tooltip: 'Delete Student',
+                              onPressed: () async {
+                                final confirmed = await _confirmAction(
+                                  context,
+                                  title: 'Delete Student Record',
+                                  message: 'Are you sure you want to permanently delete student "${s.name}" (#${s.adm})? All marks, attendance, and registration history will be removed.',
+                                  confirmLabel: 'Delete Student',
+                                );
+                                if (confirmed) {
+                                  await provider.deleteStudent(s.id);
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Student "${s.name}" deleted.')));
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1368,19 +1616,78 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
           const SizedBox(height: 20),
 
           // Active Classes Grid
-          Text('Active Classes (${provider.classes.length})', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Active Classes (${provider.classes.length})', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+              const Text('Tap class chip to Rename', style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontStyle: FontStyle.italic)),
+            ],
+          ),
           const SizedBox(height: 10),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: provider.classes.map((c) {
               final count = provider.students.where((s) => s.studentClass == c && s.status == 'Active').length;
-              return Chip(
+              return InputChip(
                 avatar: CircleAvatar(backgroundColor: Colors.blue.shade100, child: Text('$count', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blue.shade900))),
                 label: Text(c, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                onDeleted: () => provider.removeClass(c),
+                onPressed: () => _showRenameClassModal(c, provider),
+                deleteIcon: const Icon(Icons.close, size: 16),
+                deleteButtonTooltipMessage: 'Delete Class',
+                onDeleted: () async {
+                  final confirmed = await _confirmAction(
+                    context,
+                    title: 'Delete Class "$c"',
+                    message: 'Are you sure you want to permanently delete class "$c"? $count enrolled student(s) currently belong to this class.',
+                    confirmLabel: 'Delete Class',
+                  );
+                  if (confirmed) {
+                    await provider.removeClass(c);
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Class "$c" deleted.')));
+                  }
+                },
               );
             }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRenameClassModal(String oldName, InstitutionProvider provider) {
+    final nameCtrl = TextEditingController(text: oldName);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Rename Class "$oldName"', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Renaming will automatically update all enrolled student assignments in the database.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+            const SizedBox(height: 12),
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: 'New Class Name (e.g. 10 B)', border: OutlineInputBorder()),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
+            onPressed: () async {
+              final newName = nameCtrl.text.trim();
+              if (newName.isNotEmpty && newName != oldName) {
+                await provider.renameClass(oldName, newName);
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Class renamed to "$newName" successfully!')));
+              }
+            },
+            child: const Text('Save & Update Students'),
           ),
         ],
       ),
@@ -1497,13 +1804,22 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                   const SizedBox(height: 14),
                   ElevatedButton.icon(
                     onPressed: () async {
-                      await provider.discontinueStudent(selectedStudent!, _discReasonCtrl.text.trim(), _discDateCtrl.text.trim());
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${selectedStudent.name} discontinued and archived!')));
-                      setState(() {
-                        _selectedDiscStudentId = null;
-                        _currentModuleIndex = 2;
-                        _currentSubIndex = 1;
-                      });
+                      final confirmed = await _confirmAction(
+                        context,
+                        title: 'Discontinue Student',
+                        message: 'Are you sure you want to mark "${selectedStudent!.name}" (#${selectedStudent.adm}) as Discontinued? The student will be moved to the Departed Directory.',
+                        confirmLabel: 'Confirm Departure',
+                        confirmColor: const Color(0xFFE11D48),
+                      );
+                      if (confirmed) {
+                        await provider.discontinueStudent(selectedStudent!, _discReasonCtrl.text.trim(), _discDateCtrl.text.trim());
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${selectedStudent.name} discontinued and archived!')));
+                        setState(() {
+                          _selectedDiscStudentId = null;
+                          _currentModuleIndex = 2;
+                          _currentSubIndex = 1;
+                        });
+                      }
                     },
                     icon: const Icon(Icons.person_remove_rounded, size: 16),
                     label: const Text('Execute Departure'),
@@ -1592,10 +1908,20 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
             ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF059669), foregroundColor: Colors.white),
               onPressed: () async {
-                await provider.readmitStudent(s, targetClass, targetYear, notesCtrl.text.trim());
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${s.name} re-admitted to $targetClass!')));
+                final confirmed = await _confirmAction(
+                  context,
+                  title: 'Confirm Re-admission',
+                  message: 'Are you sure you want to re-admit "${s.name}" (#${s.adm}) to class "$targetClass" for academic year "$targetYear"?',
+                  confirmLabel: 'Re-admit Student',
+                  confirmColor: const Color(0xFF059669),
+                );
+                if (confirmed) {
+                  await provider.readmitStudent(s, targetClass, targetYear, notesCtrl.text.trim());
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${s.name} re-admitted to $targetClass!')));
+                }
               },
               child: const Text('Confirm Re-admission'),
             ),
@@ -1813,15 +2139,71 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                 Row(
                   children: [
                     Text('₹${f.globalAmount.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF2563EB)),
+                      tooltip: 'Edit Fee Item',
+                      onPressed: () => _showEditCustomFeeModal(f, provider),
+                    ),
                     IconButton(
                       icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                      onPressed: () => provider.deleteCustomFeeItem(f.id),
+                      tooltip: 'Delete Fee Item',
+                      onPressed: () async {
+                        final confirmed = await _confirmAction(
+                          context,
+                          title: 'Delete Fee Item',
+                          message: 'Are you sure you want to permanently delete custom fee item "${f.name}"?',
+                          confirmLabel: 'Delete Item',
+                        );
+                        if (confirmed) {
+                          await provider.deleteCustomFeeItem(f.id);
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Fee Item "${f.name}" deleted.')));
+                        }
+                      },
                     ),
                   ],
                 ),
               ],
             ),
           )),
+        ],
+      ),
+    );
+  }
+
+  void _showEditCustomFeeModal(CustomFeeItem f, InstitutionProvider provider) {
+    final nameCtrl = TextEditingController(text: f.name);
+    final amtCtrl = TextEditingController(text: f.globalAmount.toStringAsFixed(0));
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Edit Fee Item: ${f.name}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Fee Name', border: OutlineInputBorder())),
+            const SizedBox(height: 12),
+            TextField(controller: amtCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Amount (₹)', border: OutlineInputBorder())),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
+            onPressed: () async {
+              final newName = nameCtrl.text.trim();
+              final newAmt = double.tryParse(amtCtrl.text.trim()) ?? f.globalAmount;
+              if (newName.isNotEmpty) {
+                final updated = f.copyWith(name: newName, globalAmount: newAmt);
+                await provider.saveCustomFeeItem(updated);
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Fee Item "${updated.name}" updated!')));
+              }
+            },
+            child: const Text('Save Changes'),
+          ),
         ],
       ),
     );
@@ -1863,9 +2245,30 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                     Text('${g.memberStudentIds.length} Sibling Members • Group Fee: ₹${g.monthlyFee.toStringAsFixed(0)}/month', style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
                   ],
                 ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                  onPressed: () => provider.deleteStudentGroup(g.id),
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF2563EB)),
+                      tooltip: 'Edit Sibling Group',
+                      onPressed: () => _showEditStudentGroupModal(g, provider),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                      tooltip: 'Delete Sibling Group',
+                      onPressed: () async {
+                        final confirmed = await _confirmAction(
+                          context,
+                          title: 'Delete Sibling Group',
+                          message: 'Are you sure you want to permanently delete sibling group "${g.name}"?',
+                          confirmLabel: 'Delete Group',
+                        );
+                        if (confirmed) {
+                          await provider.deleteStudentGroup(g.id);
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Sibling Group "${g.name}" deleted.')));
+                        }
+                      },
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -1945,6 +2348,76 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
     );
   }
 
+  void _showEditStudentGroupModal(StudentGroup g, InstitutionProvider provider) {
+    final nameCtrl = TextEditingController(text: g.name);
+    final feeCtrl = TextEditingController(text: g.monthlyFee.toStringAsFixed(0));
+    final selectedIds = Set<String>.from(g.memberStudentIds);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('Edit Sibling Group: ${g.name}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Group Name', border: OutlineInputBorder())),
+                const SizedBox(height: 10),
+                TextField(controller: feeCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Consolidated Monthly Fee (₹)', border: OutlineInputBorder())),
+                const SizedBox(height: 12),
+                const Text('Group Sibling Members:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                const SizedBox(height: 6),
+                SizedBox(
+                  height: 180,
+                  width: double.maxFinite,
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: provider.activeStudents.length,
+                    itemBuilder: (ctx, idx) {
+                      final s = provider.activeStudents[idx];
+                      final isSel = selectedIds.contains(s.id);
+                      return CheckboxListTile(
+                        dense: true,
+                        value: isSel,
+                        title: Text('${s.name} (${s.studentClass})', style: const TextStyle(fontSize: 12)),
+                        onChanged: (v) {
+                          setDlg(() {
+                            if (v == true) selectedIds.add(s.id); else selectedIds.remove(s.id);
+                          });
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
+              onPressed: () async {
+                final updated = StudentGroup(
+                  id: g.id,
+                  name: nameCtrl.text.trim(),
+                  monthlyFee: double.tryParse(feeCtrl.text.trim()) ?? g.monthlyFee,
+                  memberStudentIds: selectedIds.toList(),
+                );
+                await provider.saveStudentGroup(updated);
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Sibling Group "${updated.name}" updated!')));
+              },
+              child: const Text('Save Changes'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // 4D. FEE CONCESSIONS
   Widget _buildFeeConcessionsTab(InstitutionProvider provider) {
     return ListView(
@@ -1980,9 +2453,30 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                     Text('Class: ${c.studentClass} • Special Fee: ₹${c.concessionMonthlyFee.toStringAsFixed(0)}/month', style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
                   ],
                 ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                  onPressed: () => provider.removeConcession(c.studentId),
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF2563EB)),
+                      tooltip: 'Edit Concession',
+                      onPressed: () => _showEditConcessionModal(c, provider),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                      tooltip: 'Cancel Concession',
+                      onPressed: () async {
+                        final confirmed = await _confirmAction(
+                          context,
+                          title: 'Cancel Fee Concession',
+                          message: 'Are you sure you want to cancel the special fee concession for "${c.studentName}"?',
+                          confirmLabel: 'Cancel Concession',
+                        );
+                        if (confirmed) {
+                          await provider.removeConcession(c.studentId);
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Concession for "${c.studentName}" cancelled.')));
+                        }
+                      },
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -2031,6 +2525,47 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showEditConcessionModal(FeeConcession c, InstitutionProvider provider) {
+    final feeCtrl = TextEditingController(text: c.concessionMonthlyFee.toStringAsFixed(0));
+    final reasonCtrl = TextEditingController(text: c.reason);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Edit Concession: ${c.studentName}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: feeCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Concession Monthly Fee (₹)', border: OutlineInputBorder())),
+            const SizedBox(height: 10),
+            TextField(controller: reasonCtrl, decoration: const InputDecoration(labelText: 'Reason / Remarks', border: OutlineInputBorder())),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
+            onPressed: () async {
+              final newFee = double.tryParse(feeCtrl.text.trim()) ?? c.concessionMonthlyFee;
+              final updated = FeeConcession(
+                studentId: c.studentId,
+                studentName: c.studentName,
+                studentClass: c.studentClass,
+                concessionMonthlyFee: newFee,
+                reason: reasonCtrl.text.trim(),
+              );
+              await provider.saveConcession(updated);
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Concession for "${c.studentName}" updated!')));
+            },
+            child: const Text('Save Changes'),
+          ),
+        ],
       ),
     );
   }
@@ -2237,14 +2772,91 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                     ],
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                  onPressed: () => provider.deleteNotice(n.id),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF2563EB)),
+                      tooltip: 'Edit Notice',
+                      onPressed: () => _showEditNoticeModal(n, provider),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                      tooltip: 'Delete Notice',
+                      onPressed: () async {
+                        final confirmed = await _confirmAction(
+                          context,
+                          title: 'Delete Notice',
+                          message: 'Are you sure you want to permanently delete notice "${n.heading}"?',
+                          confirmLabel: 'Delete Notice',
+                        );
+                        if (confirmed) {
+                          await provider.deleteNotice(n.id);
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Notice "${n.heading}" deleted.')));
+                        }
+                      },
+                    ),
+                  ],
                 ),
               ],
             ),
           )),
         ],
+      ),
+    );
+  }
+
+  void _showEditNoticeModal(Notice n, InstitutionProvider provider) {
+    final headCtrl = TextEditingController(text: n.heading);
+    final descCtrl = TextEditingController(text: n.description);
+    final dateCtrl = TextEditingController(text: n.date);
+    bool isPinned = n.isPinned;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('Edit Notice: ${n.heading}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: headCtrl, decoration: const InputDecoration(labelText: 'Notice Heading', border: OutlineInputBorder())),
+                const SizedBox(height: 10),
+                TextField(controller: descCtrl, maxLines: 3, decoration: const InputDecoration(labelText: 'Notice Body', border: OutlineInputBorder())),
+                const SizedBox(height: 10),
+                TextField(controller: dateCtrl, decoration: const InputDecoration(labelText: 'Date (YYYY-MM-DD)', border: OutlineInputBorder())),
+                const SizedBox(height: 10),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: isPinned,
+                  title: const Text('Pin Notice to Top', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  onChanged: (v) => setDlg(() => isPinned = v ?? false),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
+              onPressed: () async {
+                final updated = Notice(
+                  id: n.id,
+                  heading: headCtrl.text.trim(),
+                  description: descCtrl.text.trim(),
+                  date: dateCtrl.text.trim(),
+                  isPinned: isPinned,
+                );
+                await provider.saveNotice(updated);
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Notice "${updated.heading}" updated!')));
+              },
+              child: const Text('Save Changes'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -2291,7 +2903,19 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                     right: 4,
                     child: IconButton(
                       icon: const Icon(Icons.delete, color: Colors.red, size: 18),
-                      onPressed: () => provider.deleteGalleryItem(g.id),
+                      tooltip: 'Delete Photo',
+                      onPressed: () async {
+                        final confirmed = await _confirmAction(
+                          context,
+                          title: 'Delete Photo',
+                          message: 'Are you sure you want to remove this photo from the institutional gallery?',
+                          confirmLabel: 'Delete Photo',
+                        );
+                        if (confirmed) {
+                          await provider.deleteGalleryItem(g.id);
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Photo deleted from gallery.')));
+                        }
+                      },
                     ),
                   ),
                 ],
@@ -2433,48 +3057,55 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
       return true;
     }).toList();
 
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(14),
-          color: Colors.white,
-          child: Row(
-            children: [
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  value: _auditCategoryFilter,
-                  decoration: const InputDecoration(labelText: 'Category', border: OutlineInputBorder()),
-                  items: const [
-                    DropdownMenuItem(value: 'all', child: Text('All Categories')),
-                    DropdownMenuItem(value: 'class', child: Text('Classes')),
-                    DropdownMenuItem(value: 'student', child: Text('Students')),
-                    DropdownMenuItem(value: 'fee', child: Text('Fees')),
-                    DropdownMenuItem(value: 'website', child: Text('Website')),
-                    DropdownMenuItem(value: 'backup', child: Text('Backup')),
-                  ],
-                  onChanged: (v) => setState(() => _auditCategoryFilter = v ?? 'all'),
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: _auditCategoryFilter,
+                    decoration: const InputDecoration(labelText: 'Category', border: OutlineInputBorder()),
+                    items: const [
+                      DropdownMenuItem(value: 'all', child: Text('All Categories')),
+                      DropdownMenuItem(value: 'class', child: Text('Classes')),
+                      DropdownMenuItem(value: 'student', child: Text('Students')),
+                      DropdownMenuItem(value: 'fee', child: Text('Fees')),
+                      DropdownMenuItem(value: 'website', child: Text('Website')),
+                      DropdownMenuItem(value: 'backup', child: Text('Backup')),
+                    ],
+                    onChanged: (v) => setState(() => _auditCategoryFilter = v ?? 'all'),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                flex: 2,
-                child: TextField(
-                  controller: _auditSearchCtrl,
-                  decoration: const InputDecoration(hintText: 'Filter audit messages...', prefixIcon: Icon(Icons.search), border: OutlineInputBorder()),
-                  onChanged: (_) => setState(() {}),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 2,
+                  child: TextField(
+                    controller: _auditSearchCtrl,
+                    decoration: const InputDecoration(hintText: 'Filter audit messages...', prefixIcon: Icon(Icons.search), border: OutlineInputBorder()),
+                    onChanged: (_) => setState(() {}),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        Expanded(
-          child: logs.isEmpty
-              ? const Center(child: Text('No audit logs recorded for this category.'))
-              : ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: logs.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 6),
-                  itemBuilder: (ctx, idx) {
+          const SizedBox(height: 14),
+          Expanded(
+            child: logs.isEmpty
+                ? const Center(child: Text('No audit logs recorded for this category.'))
+                : ListView.separated(
+                    padding: EdgeInsets.zero,
+                    itemCount: logs.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 6),
+                    itemBuilder: (ctx, idx) {
                     final l = logs[idx];
                     return Container(
                       padding: const EdgeInsets.all(10),
@@ -2504,8 +3135,9 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                     );
                   },
                 ),
-        ),
-      ],
+          ),
+        ],
+      ),
     );
   }
 }
