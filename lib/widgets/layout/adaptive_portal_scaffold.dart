@@ -358,20 +358,10 @@ class _AdaptivePortalScaffoldState extends State<AdaptivePortalScaffold> {
                   ),
                 ),
 
-                // Right: Actions, Theme Switch & Profile Dropdown (Replaces Back button)
+                // Right: Actions & Profile Dropdown
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    IconButton(
-                      tooltip: provider.isDarkMode ? 'Light Mode' : 'Dark Mode',
-                      icon: Icon(
-                        provider.isDarkMode ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-                        size: 20,
-                        color: provider.isDarkMode ? Colors.amber : const Color(0xFF64748B),
-                      ),
-                      onPressed: () => provider.toggleTheme(),
-                    ),
-                    const SizedBox(width: 4),
                     if (widget.headerActions != null) ...widget.headerActions!,
                     const SizedBox(width: 8),
 
@@ -831,15 +821,6 @@ class _AdaptivePortalScaffoldState extends State<AdaptivePortalScaffold> {
           ],
         ),
         actions: [
-          IconButton(
-            tooltip: provider.isDarkMode ? 'Light Mode' : 'Dark Mode',
-            icon: Icon(
-              provider.isDarkMode ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-              size: 20,
-              color: provider.isDarkMode ? Colors.amber : const Color(0xFF64748B),
-            ),
-            onPressed: () => provider.toggleTheme(),
-          ),
           PopupMenuButton<String>(
             tooltip: 'Profile & Session',
             icon: CircleAvatar(
@@ -969,7 +950,7 @@ class _AdaptivePortalScaffoldState extends State<AdaptivePortalScaffold> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'More / കസ്റ്റം',
+                            'More / Custom',
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: (!pinnedLeaves.any((l) => l.tabIndex == _currentTabIndex && l.subIndex == _currentSubIndex))
@@ -1130,7 +1111,7 @@ class _AdaptivePortalScaffoldState extends State<AdaptivePortalScaffold> {
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
-                                        'ബോട്ടം നാവിഗേഷനായി കൃത്യമായി 4 ടാബുകൾ വരെ സെലക്ട് ചെയ്യാം (${_pinnedTabIds.length} / 4 തിരഞ്ഞെടുത്തു).',
+                                        'Select up to 4 quick access tabs (${_pinnedTabIds.length} / 4 selected).',
                                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1E40AF)),
                                       ),
                                     ),
@@ -1156,7 +1137,7 @@ class _AdaptivePortalScaffoldState extends State<AdaptivePortalScaffold> {
                                           if (val == true) {
                                             if (_pinnedTabIds.length >= 4) {
                                               ScaffoldMessenger.of(context).showSnackBar(
-                                                const SnackBar(content: Text('മാക്സിമം 4 ടാബുകൾ മാത്രമേ തിരഞ്ഞെടുക്കാൻ സാധിക്കൂ!')),
+                                                const SnackBar(content: Text('You can select a maximum of 4 tabs!')),
                                               );
                                             } else {
                                               _pinnedTabIds.add(leaf.id);
@@ -1164,7 +1145,7 @@ class _AdaptivePortalScaffoldState extends State<AdaptivePortalScaffold> {
                                           } else {
                                             if (_pinnedTabIds.length <= 1) {
                                               ScaffoldMessenger.of(context).showSnackBar(
-                                                const SnackBar(content: Text('കുറഞ്ഞത് ഒരു ടാബ് എങ്കിലും വേണം!')),
+                                                const SnackBar(content: Text('At least one tab must remain selected!')),
                                               );
                                             } else {
                                               _pinnedTabIds.remove(leaf.id);
@@ -1185,11 +1166,11 @@ class _AdaptivePortalScaffoldState extends State<AdaptivePortalScaffold> {
                                     if (mounted) setState(() {});
                                     Navigator.pop(ctx);
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('ബോട്ടം നാവിഗേഷൻ ഈ ഡിവൈസിനായി ക്രമീകരിച്ചു!')),
+                                      const SnackBar(content: Text('Bottom navigation preferences saved!')),
                                     );
                                   },
                                   icon: const Icon(Icons.save_rounded, size: 18),
-                                  label: const Text('സേവ് ചെയ്ത് അപ്ലൈ ചെയ്യുക (Save Preferences)'),
+                                  label: const Text('Save & Apply Navigation Preferences'),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: const Color(0xFF2563EB),
                                     foregroundColor: Colors.white,

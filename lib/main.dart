@@ -32,8 +32,7 @@ class InstitutionManagementApp extends StatelessWidget {
       title: setting.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
-      themeMode: provider.themeMode,
+      themeMode: ThemeMode.light,
       routerConfig: AppRouter.router,
     );
   }

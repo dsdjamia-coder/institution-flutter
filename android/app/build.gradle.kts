@@ -32,15 +32,13 @@ android {
 
     buildTypes {
         release {
-            // --- മാറ്റങ്ങൾ വരുത്തിയത് ഇവിടെയാണ് ---
-            
-            // 1. കോഡ് ചുരുക്കാൻ (Minify) നിർദ്ദേശം നൽകുന്നു
+            // Code minification and optimization
             isMinifyEnabled = true
             
-            // 2. ആവശ്യമില്ലാത്ത ചിത്രങ്ങളും ഫയലുകളും നീക്കം ചെയ്യുന്നു (Shrink)
+            // Resource shrinking to remove unused assets
             isShrinkResources = true
             
-            // പ്രോഗാർഡ് നിയമങ്ങൾ (ഇത് സുരക്ഷയ്ക്കും സൈസ് കുറയ്ക്കാനും സഹായിക്കും)
+            // Proguard rules for optimization and security
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

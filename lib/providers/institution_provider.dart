@@ -20,19 +20,10 @@ class InstitutionProvider extends ChangeNotifier {
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
-  ThemeMode _themeMode = ThemeMode.light;
+  // Light theme locked
+  final ThemeMode _themeMode = ThemeMode.light;
   ThemeMode get themeMode => _themeMode;
-  bool get isDarkMode => _themeMode == ThemeMode.dark;
-
-  void toggleTheme() {
-    _themeMode = _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
-    notifyListeners();
-  }
-
-  void setThemeMode(ThemeMode mode) {
-    _themeMode = mode;
-    notifyListeners();
-  }
+  bool get isDarkMode => false;
 
   InstitutionSetting _setting = InstitutionSetting();
   InstitutionSetting get setting => _setting;
