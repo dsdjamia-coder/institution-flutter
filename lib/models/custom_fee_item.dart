@@ -47,4 +47,24 @@ class CustomFeeItem {
       'isReceiptRequired': isReceiptRequired,
     };
   }
+
+  CustomFeeItem copyWith({
+    String? id,
+    String? name,
+    String? scope,
+    double? globalAmount,
+    Map<String, double>? classWiseAmounts,
+    String? specificClass,
+    bool? isReceiptRequired,
+  }) {
+    return CustomFeeItem(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      scope: scope ?? this.scope,
+      globalAmount: globalAmount ?? this.globalAmount,
+      classWiseAmounts: classWiseAmounts ?? this.classWiseAmounts,
+      specificClass: specificClass ?? this.specificClass,
+      isReceiptRequired: isReceiptRequired ?? this.isReceiptRequired,
+    );
+  }
 }
