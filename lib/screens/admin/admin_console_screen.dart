@@ -322,8 +322,10 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
     required List<String> labels,
     required List<IconData> icons,
     required int selectedIndex,
-    required ValueChanged<int> onSelected,
+    ValueChanged<int>? onSelected,
+    ValueChanged<int>? onTabChanged,
   }) {
+    final callback = onTabChanged ?? onSelected ?? (_) {};
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: const BoxDecoration(
@@ -338,7 +340,7 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
             return Padding(
               padding: const EdgeInsets.only(right: 8),
               child: InkWell(
-                onTap: () => onSelected(idx),
+                onTap: () => callback(idx),
                 borderRadius: BorderRadius.circular(10),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -541,8 +543,8 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                     const Text('Configure Academic Years (YYYY-YYYY)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(color: Colors.emerald.shade50, borderRadius: BorderRadius.circular(8)),
-                      child: Text('Current: ${setting.activeAcademicYear}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.emerald.shade800)),
+                      decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(8)),
+                      child: Text('Current: ${setting.activeAcademicYear}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF065F46))),
                     ),
                   ],
                 ),
@@ -594,22 +596,22 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: isCurrent ? Colors.emerald.shade300 : const Color(0xFFE2E8F0)),
+                  border: Border.all(color: isCurrent ? const Color(0xFF6EE7B7) : const Color(0xFFE2E8F0)),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.calendar_today_rounded, size: 18, color: isCurrent ? Colors.emerald.shade600 : Colors.blue.shade600),
+                        Icon(Icons.calendar_today_rounded, size: 18, color: isCurrent ? const Color(0xFF059669) : Colors.blue.shade600),
                         const SizedBox(width: 12),
                         Text(y.label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                         const SizedBox(width: 10),
                         if (isCurrent)
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(color: Colors.emerald.shade50, borderRadius: BorderRadius.circular(6)),
-                            child: Text('CURRENT WORKING YEAR', style: TextStyle(color: Colors.emerald.shade800, fontSize: 10, fontWeight: FontWeight.bold)),
+                            decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(6)),
+                            child: const Text('CURRENT WORKING YEAR', style: TextStyle(color: Color(0xFF065F46), fontSize: 10, fontWeight: FontWeight.bold)),
                           ),
                       ],
                     ),
@@ -995,17 +997,17 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                                     const SizedBox(width: 6),
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(color: Colors.slate.shade100, borderRadius: BorderRadius.circular(4)),
+                                      decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(4)),
                                       child: Text('#${s.adm}', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
                                     ),
                                     const SizedBox(width: 6),
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                       decoration: BoxDecoration(
-                                        color: s.status == 'Active' ? Colors.emerald.shade50 : (s.status == 'Alumni' ? Colors.purple.shade50 : Colors.rose.shade50),
+                                        color: s.status == 'Active' ? const Color(0xFFECFDF5) : (s.status == 'Alumni' ? const Color(0xFFFAF5FF) : const Color(0xFFFFF1F2)),
                                         borderRadius: BorderRadius.circular(4),
                                       ),
-                                      child: Text(s.status, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: s.status == 'Active' ? Colors.emerald.shade800 : Colors.purple.shade800)),
+                                      child: Text(s.status, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: s.status == 'Active' ? const Color(0xFF065F46) : const Color(0xFF6B21A8))),
                                     ),
                                   ],
                                 ),
@@ -1454,7 +1456,7 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                   const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: Colors.rose.shade50, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.rose.shade200)),
+                    decoration: BoxDecoration(color: const Color(0xFFFFF1F2), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFFECDD3))),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -1517,7 +1519,7 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
             decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
             child: Row(
               children: [
-                CircleAvatar(backgroundColor: Colors.rose.shade50, child: Icon(Icons.person_off_rounded, color: Colors.rose.shade700, size: 18)),
+                CircleAvatar(backgroundColor: const Color(0xFFFFF1F2), child: const Icon(Icons.person_off_rounded, color: Color(0xFFBE123C), size: 18)),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
@@ -1530,7 +1532,7 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () => _showReadmitModal(s, provider),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.emerald.shade600, foregroundColor: Colors.white),
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF059669), foregroundColor: Colors.white),
                   child: const Text('Re-admit', style: TextStyle(fontSize: 12)),
                 ),
               ],
@@ -1557,7 +1559,7 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
             children: [
               Container(
                 padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: Colors.emerald.shade50, borderRadius: BorderRadius.circular(8)),
+                decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(8)),
                 child: const Text('Zero fee guarantee for inactive gap years. Fee starts strictly upon re-admission.', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF047857))),
               ),
               const SizedBox(height: 12),
@@ -1614,7 +1616,7 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
             decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFE2E8F0))),
             child: Row(
               children: [
-                Icon(l['action'] == 'DISCONTINUED' ? Icons.exit_to_app_rounded : Icons.login_rounded, size: 18, color: l['action'] == 'DISCONTINUED' ? Colors.rose : Colors.emerald),
+                Icon(l['action'] == 'DISCONTINUED' ? Icons.exit_to_app_rounded : Icons.login_rounded, size: 18, color: l['action'] == 'DISCONTINUED' ? const Color(0xFFE11D48) : const Color(0xFF059669)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -2308,7 +2310,7 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                 fit: StackFit.expand,
                 children: [
                   Container(
-                    decoration: BoxDecoration(color: Colors.slate.shade100, borderRadius: BorderRadius.circular(10)),
+                    decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(10)),
                     child: const Icon(Icons.image, size: 30, color: Colors.grey),
                   ),
                   Positioned(

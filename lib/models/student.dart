@@ -8,7 +8,11 @@ class Student {
   final String mobile;
   final String father;
   final String mother;
+  final String motherMobile;
   final String dob;
+  final String admissionDate;
+  final String adhaar;
+  final String uid;
   final String address;
   final String status; // 'Active', 'Inactive', 'Alumni', 'Discontinued'
   final String photo;
@@ -32,7 +36,11 @@ class Student {
     this.mobile = '',
     this.father = '',
     this.mother = '',
+    this.motherMobile = '',
     this.dob = '',
+    this.admissionDate = '',
+    this.adhaar = '',
+    this.uid = '',
     this.address = '',
     this.status = 'Active',
     this.photo = '',
@@ -53,6 +61,12 @@ class Student {
     return '[#$adm] $name ($studentClass)$fatherPart';
   }
 
+  // Aliases for parity across different screens
+  String get admNo => adm;
+  String get currentClass => studentClass;
+  String get guardianName => father;
+  String get phone => mobile;
+
   factory Student.fromMap(Map<String, dynamic> map, String docId) {
     return Student(
       id: docId,
@@ -64,7 +78,11 @@ class Student {
       mobile: (map['mobile'] ?? map['phone'] ?? '').toString().trim(),
       father: (map['father'] ?? map['fatherName'] ?? map['guardianName'] ?? '').toString().trim(),
       mother: (map['mother'] ?? map['motherName'] ?? '').toString().trim(),
+      motherMobile: (map['motherMobile'] ?? map['motherPhone'] ?? '').toString().trim(),
       dob: (map['dob'] ?? '').toString(),
+      admissionDate: (map['admissionDate'] ?? map['admDate'] ?? '').toString(),
+      adhaar: (map['adhaar'] ?? map['aadhaar'] ?? '').toString(),
+      uid: (map['uid'] ?? '').toString(),
       address: (map['address'] ?? '').toString(),
       status: (map['status'] ?? 'Active').toString(),
       photo: (map['photo'] ?? map['photoUrl'] ?? '').toString(),
@@ -94,7 +112,11 @@ class Student {
       'father': father.toUpperCase().trim(),
       'guardianName': father.toUpperCase().trim(),
       'mother': mother.toUpperCase().trim(),
+      'motherMobile': motherMobile,
       'dob': dob,
+      'admissionDate': admissionDate,
+      'adhaar': adhaar,
+      'uid': uid,
       'address': address,
       'status': status,
       'photo': photo,
@@ -121,7 +143,11 @@ class Student {
     String? mobile,
     String? father,
     String? mother,
+    String? motherMobile,
     String? dob,
+    String? admissionDate,
+    String? adhaar,
+    String? uid,
     String? address,
     String? status,
     String? photo,
@@ -145,7 +171,11 @@ class Student {
       mobile: mobile ?? this.mobile,
       father: father ?? this.father,
       mother: mother ?? this.mother,
+      motherMobile: motherMobile ?? this.motherMobile,
       dob: dob ?? this.dob,
+      admissionDate: admissionDate ?? this.admissionDate,
+      adhaar: adhaar ?? this.adhaar,
+      uid: uid ?? this.uid,
       address: address ?? this.address,
       status: status ?? this.status,
       photo: photo ?? this.photo,
