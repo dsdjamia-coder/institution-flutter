@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
+import 'package:google_fonts/google_fonts.dart';
+import '../../core/theme/app_colors.dart';
 
 class LandingStatCard extends StatelessWidget {
   final String title;
@@ -19,13 +22,13 @@ class LandingStatCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.slate200),
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: AppColors.cardShadow,
+            blurRadius: 16,
+            offset: Offset(0, 4),
           ),
         ],
       ),
@@ -35,12 +38,12 @@ class LandingStatCard extends StatelessWidget {
           children: [
             // Left colored accent line (4px width)
             Container(
-              width: 4,
+              width: 5,
               color: accentColor,
             ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.center,
@@ -61,18 +64,27 @@ class LandingStatCard extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           count,
-                          style: const TextStyle(
-                            fontSize: 24,
+                          style: GoogleFonts.inter(
+                            fontSize: 26,
                             fontWeight: FontWeight.w800,
-                            color: Color(0xFF0F172A),
+                            color: const Color(0xFF0F172A),
+                            fontFeatures: const [FontFeature.tabularFigures()],
                           ),
                         ),
                       ],
                     ),
-                    Icon(
-                      icon,
-                      color: accentColor.withOpacity(0.45),
-                      size: 32,
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: accentColor.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        icon,
+                        color: accentColor,
+                        size: 24,
+                      ),
                     ),
                   ],
                 ),

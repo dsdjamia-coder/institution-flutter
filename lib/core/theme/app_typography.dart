@@ -1,18 +1,33 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
 import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
-/// Centralized Typographic Scale with Malayalam & Multilingual Shaping Support
+/// Centralized Typographic Scale with Clean Modern SaaS Hierarchy
 class AppTypography {
   // Font Family Stacks
   static const List<String> fontFallbacks = [
-    'Manjari',
-    'Gayathri',
-    'Noto Sans Malayalam',
-    'Noto Sans Arabic',
     'Roboto',
     'sans-serif',
   ];
+
+  /// Returns a style copy with fontFeatures configured for tabular numbers (aligned digits)
+  static TextStyle tabular(TextStyle base) {
+    return base.copyWith(fontFeatures: const [FontFeature.tabularFigures()]);
+  }
+
+  static TextStyle get tabularMetric => GoogleFonts.inter(
+        fontSize: 18,
+        fontWeight: FontWeight.w700,
+        fontFeatures: const [FontFeature.tabularFigures()],
+      );
+
+  static TextStyle get tabularCurrency => GoogleFonts.inter(
+        fontSize: 20,
+        fontWeight: FontWeight.w800,
+        fontFeatures: const [FontFeature.tabularFigures()],
+        color: AppColors.primary700,
+      );
 
   static TextStyle get displayLarge => GoogleFonts.inter(
         fontSize: 32,

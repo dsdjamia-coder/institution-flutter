@@ -65,6 +65,30 @@ class AppColors {
   static const Color lightTextSecondary = Color(0xFF475569);
   static const Color lightTextMuted = Color(0xFF94A3B8);
 
+  // Modern SaaS Elevations & Shadows
+  static const Color cardShadow = Color(0x0A0F172A); // Soft 4% slate shadow
+  static const Color cardHoverShadow = Color(0x140F172A); // Elevated 8% slate shadow
+  static const Color accentGlow = Color(0x1F2563EB); // Subtle brand glow
+
+  // Modern Micro-Gradients
+  static const LinearGradient primaryGradient = LinearGradient(
+    colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const LinearGradient heroSurfaceGradient = LinearGradient(
+    colors: [Colors.white, Color(0xFFF8FAFC)],
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+  );
+
+  static const LinearGradient cardAccentGradient = LinearGradient(
+    colors: [Color(0xFFEFF6FF), Colors.white],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
   // Surface & Canvas (Dark Mode)
   static const Color darkBackground = Color(0xFF090D16);
   static const Color darkSurface = Color(0xFF111827);

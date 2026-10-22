@@ -11,6 +11,8 @@ class AppCard extends StatelessWidget {
   final Color? color;
   final Color? borderColor;
   final BorderRadius? borderRadius;
+  final bool isElevated;
+  final Gradient? gradient;
 
   const AppCard({
     super.key,
@@ -21,21 +23,32 @@ class AppCard extends StatelessWidget {
     this.color,
     this.borderColor,
     this.borderRadius,
+    this.isElevated = true,
+    this.gradient,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final r = borderRadius ?? AppRadius.md;
-    final bg = color ?? (isDark ? AppColors.darkSurface : Colors.white);
-    final border = borderColor ?? (isDark ? AppColors.darkBorder : AppColors.lightBorder);
+    final bg = gradient == null ? (color ?? Colors.white) : null;
+    final border = borderColor ?? AppColors.lightBorder;
 
     final cardContent = Container(
       padding: padding,
       decoration: BoxDecoration(
         color: bg,
+        gradient: gradient,
         borderRadius: r,
         border: Border.all(color: border),
+        boxShadow: isElevated
+            ? const [
+                BoxShadow(
+                  color: AppColors.cardShadow,
+                  blurRadius: 16,
+                  offset: Offset(0, 4),
+                ),
+              ]
+            : null,
       ),
       child: child,
     );
