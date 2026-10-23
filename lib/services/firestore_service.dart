@@ -361,6 +361,7 @@ class FirestoreService {
         StaffCategory(id: 'Teacher', name: 'Teacher', order: 1, showPublic: true, isCore: true),
         StaffCategory(id: 'Management', name: 'Management', order: 2, showPublic: true, isCore: true),
       ]);
+      saveStaffCategories(_cachedStaffCategories);
     }
     return _cachedStaffCategories;
   }
@@ -588,7 +589,7 @@ class FirestoreService {
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
         final fields = _decodeFirestoreFields(data['fields'] ?? {});
-        if (fields['yearsList'] is List) {
+        if (fields['yearsList'] is List && (fields['yearsList'] as List).isNotEmpty) {
           _cachedYears.clear();
           for (final y in fields['yearsList']) {
             if (y is Map<String, dynamic>) {
@@ -605,10 +606,11 @@ class FirestoreService {
     }
     if (_cachedYears.isEmpty) {
       _cachedYears.addAll([
-        AcademicYearConfig(label: '2026-2027', status: 'current'),
-        AcademicYearConfig(label: '2025-2026', status: 'active'),
-        AcademicYearConfig(label: '2024-2025', status: 'archived'),
+        AcademicYearConfig(label: '2024-2025', status: 'archived', startMonth: 'June', endMonth: 'May'),
+        AcademicYearConfig(label: '2025-2026', status: 'current', startMonth: 'June', endMonth: 'May'),
+        AcademicYearConfig(label: '2026-2027', status: 'active', startMonth: 'June', endMonth: 'May'),
       ]);
+      saveAcademicYears(_cachedYears);
     }
     return _cachedYears;
   }

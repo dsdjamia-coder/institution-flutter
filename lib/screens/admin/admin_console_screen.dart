@@ -613,223 +613,184 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
     return result ?? false;
   }
 
-// ========================================================================
-  // MODULE 1: INSTITUTION & ACADEMIC CONTROL
+// Complete Refined Module 1 implementation for AdminConsoleScreenState
+// Written to scratch/mod1_refined.dart for syntax check and validation
+
+  // ========================================================================
+  // MODULE 1: INSTITUTION & ACADEMIC CONTROL (COMPACT & REFINED)
   // ========================================================================
 
   // 1A. DASHBOARD (#dashboard / dashboard-page)
   Widget _buildOverviewTab(InstitutionProvider provider, dynamic setting) {
-    final activeYear = setting.activeAcademicYear.isNotEmpty ? setting.activeAcademicYear : '2024-2025';
-    final totalConfiguredYears = provider.academicYears.isNotEmpty ? provider.academicYears.length : 1;
-    final totalActiveStudents = provider.totalActiveStudents;
-    final totalClasses = provider.classes.length;
-    final activeStaffCount = provider.activeStaffCount > 0 ? provider.activeStaffCount : provider.totalStaff;
-    final totalFeeItems = provider.customFeeItems.length + 1;
+    final activeYear = setting.activeAcademicYear.isNotEmpty ? setting.activeAcademicYear : '2025-2026';
+    final hasStudents = provider.totalStudents > 0;
+    final hasClasses = provider.classes.isNotEmpty;
+    final hasStaff = provider.totalStaff > 0;
+    final hasFeePlan = provider.customFeeItems.isNotEmpty;
+    final readinessScore = [hasStudents, hasClasses, hasStaff, hasFeePlan].where((b) => b).length * 25;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isDesktop = constraints.maxWidth >= 900;
-
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1200),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Top Institutional Badge Card
-              Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                  boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 8, offset: Offset(0, 2))],
-                ),
-                child: Row(
-                  children: [
-                    Image.asset('assets/icon.png', width: 28, height: 28, errorBuilder: (_, __, ___) => const Icon(Icons.school, size: 28, color: Color(0xFF2563EB))),
-                    const SizedBox(width: 12),
-                    Text(
-                      setting.institutionName.toUpperCase(),
-                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, letterSpacing: 0.5, color: Color(0xFF0F172A)),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Header: Institution Command Center
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                  boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 10, offset: Offset(0, 4))],
-                ),
-                child: isDesktop
-                    ? Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Column(
+              // Clean Header Bar
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isDesktop = constraints.maxWidth >= 680;
+                  return isDesktop
+                      ? Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
-                              children: const [
+                              children: [
                                 Text(
-                                  'ADMIN OVERVIEW',
-                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 2.5, color: Color(0xFF2563EB)),
+                                  setting.institutionName.isNotEmpty ? setting.institutionName : 'Institution Dashboard',
+                                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF0F172A), letterSpacing: -0.5),
                                 ),
-                                SizedBox(height: 6),
-                                Text(
-                                  'Institution Command Center',
-                                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
-                                ),
-                                SizedBox(height: 6),
-                                Text(
-                                  'Monitor the active academic year, core records, and jump directly into day-to-day administration.',
-                                  style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                                const SizedBox(height: 2),
+                                const Text(
+                                  'Overview of institutional health, active sessions, and key metrics.',
+                                  style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
                                 ),
                               ],
                             ),
-                          ),
-                          const SizedBox(width: 20),
-                          _buildActiveYearBadgeBox(activeYear, totalConfiguredYears),
-                        ],
-                      )
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'ADMIN OVERVIEW',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 2.5, color: Color(0xFF2563EB)),
-                          ),
-                          const SizedBox(height: 6),
-                          const Text(
-                            'Institution Command Center',
-                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
-                          ),
-                          const SizedBox(height: 6),
-                          const Text(
-                            'Monitor the active academic year, core records, and jump directly into day-to-day administration.',
-                            style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
-                          ),
-                          const SizedBox(height: 16),
-                          _buildActiveYearBadgeBox(activeYear, totalConfiguredYears),
-                        ],
-                      ),
+                            _buildActiveYearBadgeBox(activeYear, provider.academicYears.length),
+                          ],
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              setting.institutionName.isNotEmpty ? setting.institutionName : 'Institution Dashboard',
+                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF0F172A), letterSpacing: -0.5),
+                            ),
+                            const SizedBox(height: 2),
+                            const Text(
+                              'Overview of institutional health, active sessions, and key metrics.',
+                              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                            ),
+                            const SizedBox(height: 12),
+                            _buildActiveYearBadgeBox(activeYear, provider.academicYears.length),
+                          ],
+                        );
+                },
               ),
               const SizedBox(height: 16),
 
-              // 4 Stat Cards
+              // 4 Soft-Tinted KPI Cards
               LayoutBuilder(
-                builder: (ctx, statConstraints) {
-                  final cols = statConstraints.maxWidth >= 900 ? 4 : (statConstraints.maxWidth >= 550 ? 2 : 1);
+                builder: (context, constraints) {
+                  final isDesktop = constraints.maxWidth >= 900;
+                  final isTablet = constraints.maxWidth >= 540;
+
                   return GridView.count(
-                    crossAxisCount: cols,
+                    crossAxisCount: isDesktop ? 4 : (isTablet ? 2 : 1),
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    crossAxisSpacing: 14,
-                    mainAxisSpacing: 14,
-                    childAspectRatio: cols == 4 ? 1.7 : 2.2,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: isDesktop ? 1.7 : 2.0,
                     children: [
-                      // Students
                       _buildDashCard(
-                        label: 'STUDENTS',
-                        value: '$totalActiveStudents',
-                        subtext: 'Records in active year',
-                        bgColor: const Color(0xFFEFF6FF),
-                        borderColor: const Color(0xFFDBEAFE),
-                        labelColor: const Color(0xFF2563EB),
-                        valueColor: const Color(0xFF1E3A8A),
-                        subtextColor: const Color(0xFF1D4ED8),
+                        label: 'Active Students',
+                        value: '${provider.totalStudents}',
+                        subtext: '${provider.maleStudents} Boys • ${provider.femaleStudents} Girls',
+                        bgColor: const Color(0xFFF0F9FF),
+                        borderColor: const Color(0xFFBAE6FD),
+                        labelColor: const Color(0xFF0369A1),
+                        valueColor: const Color(0xFF0C4A6E),
+                        subtextColor: const Color(0xFF0284C7),
                       ),
-                      // Classes
                       _buildDashCard(
-                        label: 'CLASSES',
-                        value: '$totalClasses',
-                        subtext: 'Active classes / divisions',
-                        bgColor: const Color(0xFFEEF2FF),
-                        borderColor: const Color(0xFFE0E7FF),
-                        labelColor: const Color(0xFF4F46E5),
-                        valueColor: const Color(0xFF312E81),
-                        subtextColor: const Color(0xFF4338CA),
-                      ),
-                      // Staff
-                      _buildDashCard(
-                        label: 'STAFF',
-                        value: '$activeStaffCount',
-                        subtext: 'Active staff accounts',
+                        label: 'Total Classes',
+                        value: '${provider.classes.length}',
+                        subtext: 'Configured Class Cohorts',
                         bgColor: const Color(0xFFECFDF5),
-                        borderColor: const Color(0xFFD1FAE5),
-                        labelColor: const Color(0xFF059669),
+                        borderColor: const Color(0xFFA7F3D0),
+                        labelColor: const Color(0xFF047857),
                         valueColor: const Color(0xFF064E3B),
-                        subtextColor: const Color(0xFF047857),
+                        subtextColor: const Color(0xFF059669),
                       ),
-                      // Fee Items
                       _buildDashCard(
-                        label: 'FEE ITEMS',
-                        value: '$totalFeeItems',
-                        subtext: 'Configured collection items',
+                        label: 'Faculty & Staff',
+                        value: '${provider.activeStaffCount > 0 ? provider.activeStaffCount : provider.totalStaff}',
+                        subtext: '${provider.staffCategories.length} Categories Active',
+                        bgColor: const Color(0xFFF5F3FF),
+                        borderColor: const Color(0xFFDDD6FE),
+                        labelColor: const Color(0xFF6D28D9),
+                        valueColor: const Color(0xFF4C1D95),
+                        subtextColor: const Color(0xFF7C3AED),
+                      ),
+                      _buildDashCard(
+                        label: 'Active Fee Items',
+                        value: '${provider.customFeeItems.length}',
+                        subtext: '${provider.concessions.length} Concessions Assigned',
                         bgColor: const Color(0xFFFFFBEB),
-                        borderColor: const Color(0xFFFEF3C7),
-                        labelColor: const Color(0xFFD97706),
+                        borderColor: const Color(0xFFFDE68A),
+                        labelColor: const Color(0xFFB45309),
                         valueColor: const Color(0xFF78350F),
-                        subtextColor: const Color(0xFFB45309),
+                        subtextColor: const Color(0xFFD97706),
                       ),
                     ],
                   );
                 },
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
 
-              // Lower Section: Quick Actions & Operational Snapshot
-              isDesktop
-                  ? Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(flex: 2, child: _buildQuickActionsCard()),
-                        const SizedBox(width: 16),
-                        Expanded(flex: 1, child: _buildOperationalSnapshotCard(provider)),
-                      ],
-                    )
-                  : Column(
-                      children: [
-                        _buildQuickActionsCard(),
-                        const SizedBox(height: 16),
-                        _buildOperationalSnapshotCard(provider),
-                      ],
-                    ),
+              // Split Section: Quick Actions & Operational Snapshot
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isDesktop = constraints.maxWidth >= 900;
+                  return isDesktop
+                      ? Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(flex: 3, child: _buildQuickActionsCard()),
+                            const SizedBox(width: 14),
+                            Expanded(flex: 2, child: _buildOperationalSnapshotCard(provider, readinessScore)),
+                          ],
+                        )
+                      : Column(
+                          children: [
+                            _buildQuickActionsCard(),
+                            const SizedBox(height: 14),
+                            _buildOperationalSnapshotCard(provider, readinessScore),
+                          ],
+                        );
+                },
+              ),
             ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
   Widget _buildActiveYearBadgeBox(String activeYear, int totalYears) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFEFF6FF),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFDBEAFE)),
+        color: const Color(0xFFECFDF5),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFA7F3D0)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
-            'ACTIVE ACADEMIC YEAR',
-            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Color(0xFF3B82F6)),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            activeYear,
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF1E3A8A)),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            '$totalYears academic year record(s) configured',
-            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF1D4ED8)),
+          Container(width: 8, height: 8, decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF059669))),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('ACTIVE ACADEMIC YEAR', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, letterSpacing: 0.6, color: Color(0xFF047857))),
+              Text('$activeYear ($totalYears Sessions)', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF065F46))),
+            ],
           ),
         ],
       ),
@@ -847,30 +808,30 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
     required Color subtextColor,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: borderColor),
+        boxShadow: const [BoxShadow(color: Color(0x060F172A), blurRadius: 8, offset: Offset(0, 2))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(
-            label,
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2, color: labelColor),
-          ),
-          const SizedBox(height: 4),
+          Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: labelColor)),
+          const SizedBox(height: 2),
           Text(
             value,
-            style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: valueColor),
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              color: valueColor,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            subtext,
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: subtextColor),
-          ),
+          const SizedBox(height: 2),
+          Text(subtext, style: TextStyle(fontSize: 11, color: subtextColor, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis),
         ],
       ),
     );
@@ -878,74 +839,60 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
 
   Widget _buildQuickActionsCard() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 10, offset: Offset(0, 4))],
+        boxShadow: const [BoxShadow(color: Color(0x080F172A), blurRadius: 8, offset: Offset(0, 2))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
-              Text('Quick Actions', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-              Text('STAGE 3', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5, color: Color(0xFF94A3B8))),
+          const Text('Quick Action Launcher', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+          const SizedBox(height: 12),
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            childAspectRatio: 2.2,
+            children: [
+              _buildQuickActionTile(
+                icon: Icons.person_add_alt_1_rounded,
+                iconColor: const Color(0xFF2563EB),
+                label: 'Manual Student Entry',
+                onTap: () => setState(() {
+                  _currentModuleIndex = 1;
+                  _currentSubIndex = 1;
+                }),
+              ),
+              _buildQuickActionTile(
+                icon: Icons.receipt_long_rounded,
+                iconColor: const Color(0xFF059669),
+                label: 'Fee Collection Window',
+                onTap: () => Navigator.pushNamed(context, '/collection'),
+              ),
+              _buildQuickActionTile(
+                icon: Icons.upload_file_rounded,
+                iconColor: const Color(0xFFD97706),
+                label: 'Bulk Upload Wizard',
+                onTap: () => setState(() {
+                  _currentModuleIndex = 1;
+                  _currentSubIndex = 2;
+                }),
+              ),
+              _buildQuickActionTile(
+                icon: Icons.history_edu_rounded,
+                iconColor: const Color(0xFF7C3AED),
+                label: 'Alumni & Continuity',
+                onTap: () => setState(() {
+                  _currentModuleIndex = 2;
+                  _currentSubIndex = 1;
+                }),
+              ),
             ],
-          ),
-          const Divider(height: 24),
-          LayoutBuilder(
-            builder: (ctx, constraints) {
-              final isTwoCol = constraints.maxWidth >= 450;
-              return GridView.count(
-                crossAxisCount: isTwoCol ? 2 : 1,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: isTwoCol ? 2.8 : 3.5,
-                children: [
-                  _buildQuickActionTile(
-                    icon: Icons.calendar_month_rounded,
-                    iconColor: const Color(0xFF2563EB),
-                    label: 'Manage Academic Years',
-                    onTap: () => setState(() {
-                      _currentModuleIndex = 0;
-                      _currentSubIndex = 1;
-                    }),
-                  ),
-                  _buildQuickActionTile(
-                    icon: Icons.person_add_rounded,
-                    iconColor: const Color(0xFF059669),
-                    label: 'Add Students',
-                    onTap: () => setState(() {
-                      _currentModuleIndex = 1;
-                      _currentSubIndex = 1;
-                    }),
-                  ),
-                  _buildQuickActionTile(
-                    icon: Icons.alt_route_rounded,
-                    iconColor: const Color(0xFF4F46E5),
-                    label: 'Classes & Divisions',
-                    onTap: () => setState(() {
-                      _currentModuleIndex = 1;
-                      _currentSubIndex = 3;
-                    }),
-                  ),
-                  _buildQuickActionTile(
-                    icon: Icons.payments_rounded,
-                    iconColor: const Color(0xFFD97706),
-                    label: 'Configure Fees',
-                    onTap: () => setState(() {
-                      _currentModuleIndex = 3;
-                      _currentSubIndex = 1;
-                    }),
-                  ),
-                ],
-              );
-            },
           ),
         ],
       ),
@@ -960,22 +907,27 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(color: const Color(0xFFE2E8F0)),
         ),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: iconColor),
-            const SizedBox(width: 12),
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(color: iconColor.withOpacity(0.12), borderRadius: BorderRadius.circular(8)),
+              child: Icon(icon, color: iconColor, size: 18),
+            ),
+            const SizedBox(width: 10),
             Expanded(
               child: Text(
                 label,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xFF1E293B)),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -984,25 +936,40 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
     );
   }
 
-  Widget _buildOperationalSnapshotCard(InstitutionProvider provider) {
+  Widget _buildOperationalSnapshotCard(InstitutionProvider provider, int readinessScore) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 10, offset: Offset(0, 4))],
+        boxShadow: const [BoxShadow(color: Color(0x080F172A), blurRadius: 8, offset: Offset(0, 2))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Operational Snapshot', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-          const Divider(height: 24),
-          _buildSnapshotRow('Student Groups', '${provider.studentGroups.length}'),
-          const Divider(height: 20),
-          _buildSnapshotRow('Girls', '${provider.totalGirls}'),
-          const Divider(height: 20),
-          _buildSnapshotRow('Boys', '${provider.totalBoys}'),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Operational Snapshot', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFECFDF5),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text('$readinessScore% Ready', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF059669))),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildSnapshotRow('Student Groups', '${provider.studentGroups.length} Configured'),
+          const Divider(height: 14),
+          _buildSnapshotRow('Enrolled Girls', '${provider.femaleStudents} Active'),
+          const Divider(height: 14),
+          _buildSnapshotRow('Enrolled Boys', '${provider.maleStudents} Active'),
+          const Divider(height: 14),
+          _buildSnapshotRow('Alumni Archives', '${provider.alumniCount} Graduated'),
         ],
       ),
     );
@@ -1012,8 +979,8 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
-        Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+        Text(label, style: const TextStyle(fontSize: 12.5, color: Color(0xFF64748B))),
+        Text(value, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
       ],
     );
   }
@@ -1022,306 +989,282 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
   // 1B. ACADEMIC YEAR CONTROL (#academic-years / academic-years-page)
   // ========================================================================
   Widget _buildAcademicYearsTab(InstitutionProvider provider, dynamic setting) {
-    final activeYear = setting.activeAcademicYear.isNotEmpty ? setting.activeAcademicYear : '2024-2025';
+    final activeYear = setting.activeAcademicYear.isNotEmpty ? setting.activeAcademicYear : '2025-2026';
     const months = [
       'January', 'February', 'March', 'April', 'May', 'June',
       'July', 'August', 'September', 'October', 'November', 'December'
     ];
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isDesktop = constraints.maxWidth >= 900;
-
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1000),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Top Form Card
+              // Top Bar: Title & Active Badge
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isDesktop = constraints.maxWidth >= 600;
+                  return isDesktop
+                      ? Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Academic Year Control', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                            _buildCurrentWorkingYearBadge(activeYear),
+                          ],
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Academic Year Control', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                            const SizedBox(height: 8),
+                            _buildCurrentWorkingYearBadge(activeYear),
+                          ],
+                        );
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // Configuration Card
               Container(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: const Color(0xFFE2E8F0)),
-                  boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 10, offset: Offset(0, 4))],
+                  boxShadow: const [BoxShadow(color: Color(0x080F172A), blurRadius: 8, offset: Offset(0, 2))],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Top Row with Title & Current Working Year Box
-                    isDesktop
-                        ? Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('Academic Year Control', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                                    SizedBox(height: 4),
-                                    Text('Create academic years, set the active working year, and use it as the foundation for student and class management.', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B))),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 20),
-                              _buildCurrentWorkingYearBadge(activeYear),
-                            ],
-                          )
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Academic Year Control', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                              const SizedBox(height: 4),
-                              const Text('Create academic years, set the active working year, and use it as the foundation for student and class management.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                              const SizedBox(height: 14),
-                              _buildCurrentWorkingYearBadge(activeYear),
-                            ],
-                          ),
-                    const Divider(height: 28),
-
-                    // 5-Column Inline Form
-                    isDesktop
-                        ? Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // 1. Year input
-                              Expanded(
-                                flex: 2,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text('Academic Year', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
-                                    const SizedBox(height: 6),
-                                    TextField(
-                                      controller: _yearLabelCtrl,
-                                      style: const TextStyle(fontFamily: 'monospace', fontSize: 13, fontWeight: FontWeight.bold),
-                                      decoration: const InputDecoration(
-                                        hintText: 'e.g. 2025-2026',
-                                        border: OutlineInputBorder(),
-                                        isDense: true,
-                                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    const Text('Format: YYYY-YYYY (e.g. 2025-2026)', style: TextStyle(fontSize: 11, color: Color(0xFF059669), fontWeight: FontWeight.w600)),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              // 2. Start Month
-                              Expanded(
-                                flex: 2,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text('Start Month', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
-                                    const SizedBox(height: 6),
-                                    DropdownButtonFormField<String>(
-                                      value: months.contains(_yearStartMonth) ? _yearStartMonth : 'June',
-                                      decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12)),
-                                      items: months.map((m) => DropdownMenuItem(value: m, child: Text(m, style: const TextStyle(fontSize: 13)))).toList(),
-                                      onChanged: (v) => setState(() => _yearStartMonth = v ?? 'June'),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              // 3. End Month
-                              Expanded(
-                                flex: 2,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text('End Month', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
-                                    const SizedBox(height: 6),
-                                    DropdownButtonFormField<String>(
-                                      value: months.contains(_yearEndMonth) ? _yearEndMonth : 'May',
-                                      decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12)),
-                                      items: months.map((m) => DropdownMenuItem(value: m, child: Text(m, style: const TextStyle(fontSize: 13)))).toList(),
-                                      onChanged: (v) => setState(() => _yearEndMonth = v ?? 'May'),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              // 4. Status
-                              Expanded(
-                                flex: 2,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text('Status', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
-                                    const SizedBox(height: 6),
-                                    DropdownButtonFormField<String>(
-                                      value: _yearStatus,
-                                      decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12)),
-                                      items: const [
-                                        DropdownMenuItem(value: 'active', child: Text('Active', style: TextStyle(fontSize: 13))),
-                                        DropdownMenuItem(value: 'current', child: Text('Current Academic Year', style: TextStyle(fontSize: 13))),
-                                        DropdownMenuItem(value: 'archived', child: Text('Archive', style: TextStyle(fontSize: 13))),
+                    const Text('Configure Academic Year', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                    const SizedBox(height: 12),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isDesktop = constraints.maxWidth >= 720;
+                        return isDesktop
+                            ? Row(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  // 1. Year input
+                                  Expanded(
+                                    flex: 2,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text('Academic Year', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+                                        const SizedBox(height: 5),
+                                        TextField(
+                                          controller: _yearLabelCtrl,
+                                          style: const TextStyle(fontFamily: 'monospace', fontSize: 13, fontWeight: FontWeight.bold),
+                                          decoration: const InputDecoration(
+                                            hintText: 'e.g. 2026-2027',
+                                            border: OutlineInputBorder(),
+                                            isDense: true,
+                                            contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                          ),
+                                        ),
                                       ],
-                                      onChanged: (v) => setState(() => _yearStatus = v ?? 'active'),
                                     ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              // 5. Button
-                              Expanded(
-                                flex: 2,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const SizedBox(height: 22),
-                                    ElevatedButton.icon(
+                                  ),
+                                  const SizedBox(width: 10),
+                                  // 2. Start Month
+                                  Expanded(
+                                    flex: 2,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text('Start Month', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+                                        const SizedBox(height: 5),
+                                        DropdownButtonFormField<String>(
+                                          value: months.contains(_yearStartMonth) ? _yearStartMonth : 'June',
+                                          decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10)),
+                                          items: months.map((m) => DropdownMenuItem(value: m, child: Text(m, style: const TextStyle(fontSize: 12.5)))).toList(),
+                                          onChanged: (v) => setState(() => _yearStartMonth = v ?? 'June'),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  // 3. End Month
+                                  Expanded(
+                                    flex: 2,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text('End Month', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+                                        const SizedBox(height: 5),
+                                        DropdownButtonFormField<String>(
+                                          value: months.contains(_yearEndMonth) ? _yearEndMonth : 'May',
+                                          decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10)),
+                                          items: months.map((m) => DropdownMenuItem(value: m, child: Text(m, style: const TextStyle(fontSize: 12.5)))).toList(),
+                                          onChanged: (v) => setState(() => _yearEndMonth = v ?? 'May'),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  // 4. Status
+                                  Expanded(
+                                    flex: 2,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text('Status', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+                                        const SizedBox(height: 5),
+                                        DropdownButtonFormField<String>(
+                                          value: _yearStatus,
+                                          decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10)),
+                                          items: const [
+                                            DropdownMenuItem(value: 'active', child: Text('Active', style: TextStyle(fontSize: 12.5))),
+                                            DropdownMenuItem(value: 'current', child: Text('Current Working Year', style: TextStyle(fontSize: 12.5))),
+                                            DropdownMenuItem(value: 'archived', child: Text('Archive', style: TextStyle(fontSize: 12.5))),
+                                          ],
+                                          onChanged: (v) => setState(() => _yearStatus = v ?? 'active'),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  // 5. Button
+                                  ElevatedButton.icon(
+                                    onPressed: () => _handleApplyYearSettings(provider),
+                                    icon: const Icon(Icons.check, size: 16),
+                                    label: const Text('Apply Year Settings', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF2563EB),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  TextField(
+                                    controller: _yearLabelCtrl,
+                                    style: const TextStyle(fontFamily: 'monospace', fontSize: 13, fontWeight: FontWeight.bold),
+                                    decoration: const InputDecoration(labelText: 'Academic Year *', hintText: 'e.g. 2026-2027', border: OutlineInputBorder()),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: DropdownButtonFormField<String>(
+                                          value: months.contains(_yearStartMonth) ? _yearStartMonth : 'June',
+                                          decoration: const InputDecoration(labelText: 'Start Month', border: OutlineInputBorder()),
+                                          items: months.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                                          onChanged: (v) => setState(() => _yearStartMonth = v ?? 'June'),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: DropdownButtonFormField<String>(
+                                          value: months.contains(_yearEndMonth) ? _yearEndMonth : 'May',
+                                          decoration: const InputDecoration(labelText: 'End Month', border: OutlineInputBorder()),
+                                          items: months.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                                          onChanged: (v) => setState(() => _yearEndMonth = v ?? 'May'),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 10),
+                                  DropdownButtonFormField<String>(
+                                    value: _yearStatus,
+                                    decoration: const InputDecoration(labelText: 'Status', border: OutlineInputBorder()),
+                                    items: const [
+                                      DropdownMenuItem(value: 'active', child: Text('Active')),
+                                      DropdownMenuItem(value: 'current', child: Text('Current Working Year')),
+                                      DropdownMenuItem(value: 'archived', child: Text('Archive')),
+                                    ],
+                                    onChanged: (v) => setState(() => _yearStatus = v ?? 'active'),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton.icon(
                                       onPressed: () => _handleApplyYearSettings(provider),
-                                      icon: const Icon(Icons.save_rounded, size: 16),
-                                      label: const Text('Apply Year Settings', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                                      icon: const Icon(Icons.check, size: 16),
+                                      label: const Text('Apply Year Settings', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: const Color(0xFF2563EB),
                                         foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                        padding: const EdgeInsets.symmetric(vertical: 12),
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                       ),
                                     ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          )
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              TextField(
-                                controller: _yearLabelCtrl,
-                                style: const TextStyle(fontFamily: 'monospace', fontSize: 13, fontWeight: FontWeight.bold),
-                                decoration: const InputDecoration(labelText: 'Academic Year *', hintText: 'e.g. 2025-2026', border: OutlineInputBorder(), helperText: 'Format: YYYY-YYYY (e.g. 2025-2026)'),
-                              ),
-                              const SizedBox(height: 12),
-                              DropdownButtonFormField<String>(
-                                value: months.contains(_yearStartMonth) ? _yearStartMonth : 'June',
-                                decoration: const InputDecoration(labelText: 'Start Month', border: OutlineInputBorder()),
-                                items: months.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-                                onChanged: (v) => setState(() => _yearStartMonth = v ?? 'June'),
-                              ),
-                              const SizedBox(height: 12),
-                              DropdownButtonFormField<String>(
-                                value: months.contains(_yearEndMonth) ? _yearEndMonth : 'May',
-                                decoration: const InputDecoration(labelText: 'End Month', border: OutlineInputBorder()),
-                                items: months.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-                                onChanged: (v) => setState(() => _yearEndMonth = v ?? 'May'),
-                              ),
-                              const SizedBox(height: 12),
-                              DropdownButtonFormField<String>(
-                                value: _yearStatus,
-                                decoration: const InputDecoration(labelText: 'Status', border: OutlineInputBorder()),
-                                items: const [
-                                  DropdownMenuItem(value: 'active', child: Text('Active')),
-                                  DropdownMenuItem(value: 'current', child: Text('Current Academic Year')),
-                                  DropdownMenuItem(value: 'archived', child: Text('Archive')),
-                                ],
-                                onChanged: (v) => setState(() => _yearStatus = v ?? 'active'),
-                              ),
-                              const SizedBox(height: 16),
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton.icon(
-                                  onPressed: () => _handleApplyYearSettings(provider),
-                                  icon: const Icon(Icons.save_rounded, size: 16),
-                                  label: const Text('Apply Year Settings', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF2563EB),
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                   ),
-                                ),
-                              ),
-                            ],
-                          ),
+                                ],
+                              );
+                      },
+                    ),
                   ],
                 ),
               ),
               const SizedBox(height: 20),
 
-              // Section: Configured Academic Years
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                  boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 10, offset: Offset(0, 4))],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: const [
-                        Text('Configured Academic Years', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                        Text('YEAR-FIRST WORKFLOW', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5, color: Color(0xFF94A3B8))),
-                      ],
-                    ),
-                    const Divider(height: 24),
-                    if (provider.academicYears.isEmpty)
-                      Container(
-                        padding: const EdgeInsets.all(40),
-                        alignment: Alignment.center,
-                        child: const Text('No academic years configured yet.', style: TextStyle(color: Color(0xFF64748B), fontStyle: FontStyle.italic)),
-                      )
-                    else
-                      LayoutBuilder(
-                        builder: (ctx, gridConstraints) {
-                          final cols = gridConstraints.maxWidth >= 960 ? 3 : (gridConstraints.maxWidth >= 600 ? 2 : 1);
-                          return GridView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: provider.academicYears.length,
-                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: cols,
-                              crossAxisSpacing: 14,
-                              mainAxisSpacing: 14,
-                              childAspectRatio: 1.35,
-                            ),
-                            itemBuilder: (ctx, idx) {
-                              final y = provider.academicYears[idx];
-                              return _buildAcademicYearCard(y, provider, setting);
-                            },
-                          );
-                        },
-                      ),
-                  ],
-                ),
+              // Section: Configured Academic Years Header
+              Text(
+                'Configured Academic Years (${provider.academicYears.length})',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
               ),
+              const SizedBox(height: 12),
+
+              if (provider.academicYears.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(32),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
+                  child: const Text('No academic years configured yet.', style: TextStyle(color: Color(0xFF64748B), fontStyle: FontStyle.italic)),
+                )
+              else
+                LayoutBuilder(
+                  builder: (ctx, gridConstraints) {
+                    final cols = gridConstraints.maxWidth >= 900 ? 3 : (gridConstraints.maxWidth >= 580 ? 2 : 1);
+                    return GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: provider.academicYears.length,
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: cols,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                        mainAxisExtent: 215, // Fixed height prevents ANY overflow or clipping
+                      ),
+                      itemBuilder: (ctx, idx) {
+                        final y = provider.academicYears[idx];
+                        return _buildAcademicYearCard(y, provider, setting);
+                      },
+                    );
+                  },
+                ),
             ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
   Widget _buildCurrentWorkingYearBadge(String activeYear) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFFECFDF5),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFA7F3D0)),
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFBFDBFE)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
-            'CURRENT WORKING YEAR',
-            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Color(0xFF059669)),
-          ),
-          const SizedBox(height: 3),
+          const Icon(Icons.stars_rounded, color: Color(0xFF2563EB), size: 16),
+          const SizedBox(width: 6),
           Text(
-            activeYear,
-            style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: Color(0xFF064E3B)),
+            'Working Year: $activeYear',
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1E40AF)),
           ),
         ],
       ),
@@ -1342,12 +1285,12 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
     final yearStaffCount = provider.activeStaffCount > 0 ? provider.activeStaffCount : provider.totalStaff;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: isCurrent ? const Color(0xFF6EE7B7) : const Color(0xFFE2E8F0)),
-        boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 8, offset: Offset(0, 2))],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isCurrent ? const Color(0xFF10B981) : const Color(0xFFE2E8F0), width: isCurrent ? 1.5 : 1.0),
+        boxShadow: const [BoxShadow(color: Color(0x060F172A), blurRadius: 6, offset: Offset(0, 2))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1359,131 +1302,81 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.calendar_month_rounded, size: 20, color: Color(0xFF2563EB)),
-                  const SizedBox(width: 8),
+                  Icon(Icons.calendar_month_rounded, size: 18, color: isCurrent ? const Color(0xFF059669) : const Color(0xFF2563EB)),
+                  const SizedBox(width: 6),
                   Text(
                     y.label,
-                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
                   ),
                 ],
               ),
               PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert, size: 20, color: Color(0xFF64748B)),
+                icon: const Icon(Icons.more_vert, size: 18, color: Color(0xFF64748B)),
+                padding: EdgeInsets.zero,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 onSelected: (val) async {
-                  if (val == 'edit') {
+                  if (val == 'make_current') {
+                    await provider.setWorkingAcademicYear(y.label);
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Active working session switched to ${y.label}!')));
+                  } else if (val == 'edit') {
                     _showEditAcademicYearModal(y, provider);
                   } else if (val == 'delete') {
-                    final confirmed = await _confirmAction(
-                      context,
-                      title: 'Delete Academic Year',
-                      message: 'Are you sure you want to delete academic year "${y.label}"? Enrolled student records may be affected.',
-                      confirmLabel: 'Delete Year',
-                    );
-                    if (confirmed) {
+                    if (isCurrent) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cannot delete the active working session!'), backgroundColor: Colors.red));
+                      return;
+                    }
+                    final ok = await _confirmAction('Delete Year', 'Are you sure you want to remove session ${y.label}?');
+                    if (ok) {
                       await provider.deleteAcademicYear(y.label);
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Academic Year "${y.label}" deleted.')));
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Academic Year "${y.label}" removed.')));
                     }
                   }
                 },
                 itemBuilder: (ctx) => [
-                  const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined, size: 16, color: Color(0xFF2563EB)), SizedBox(width: 8), Text('Edit months', style: TextStyle(fontSize: 12.5))])),
-                  const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 16, color: Colors.red), SizedBox(width: 8), Text('Delete year', style: TextStyle(fontSize: 12.5, color: Colors.red))])),
+                  if (!isCurrent)
+                    const PopupMenuItem(value: 'make_current', child: Row(children: [Icon(Icons.check_circle_outline, size: 16, color: Color(0xFF059669)), SizedBox(width: 8), Text('Set as Working Year', style: TextStyle(fontSize: 12.5))])),
+                  const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined, size: 16, color: Color(0xFF2563EB)), SizedBox(width: 8), Text('Edit Year', style: TextStyle(fontSize: 12.5))])),
+                  if (!isCurrent)
+                    const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 16, color: Colors.red), SizedBox(width: 8), Text('Delete Year', style: TextStyle(fontSize: 12.5, color: Colors.red))])),
                 ],
               ),
             ],
           ),
 
-          // Row 2: Status Badge & Status Dropdown Select
+          // Row 2: Status Pill & Duration
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Badge
-              if (isCurrent)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFA7F3D0))),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF059669)),
-                      SizedBox(width: 4),
-                      Text('Current Academic Year', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF065F46))),
-                    ],
-                  ),
-                )
-              else if (isArchived)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: const Color(0xFFFFFBEB), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFFDE68A))),
-                  child: const Text('Archive', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF92400E))),
-                )
-              else
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFBFDBFE))),
-                  child: const Text('Active', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1E40AF))),
-                ),
-
-              // Status Dropdown
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  color: isCurrent ? const Color(0xFFECFDF5) : (isArchived ? const Color(0xFFF1F5F9) : const Color(0xFFEFF6FF)),
+                  borderRadius: BorderRadius.circular(6),
                 ),
-                child: DropdownButton<String>(
-                  value: isCurrent ? 'current' : (isArchived ? 'archived' : 'active'),
-                  underline: const SizedBox(),
-                  isDense: true,
-                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
-                  items: const [
-                    DropdownMenuItem(value: 'active', child: Text('Active')),
-                    DropdownMenuItem(value: 'current', child: Text('Current Academic Year')),
-                    DropdownMenuItem(value: 'archived', child: Text('Archive')),
-                  ],
-                  onChanged: (newStatus) async {
-                    if (newStatus == null) return;
-                    if (newStatus == 'current') {
-                      await provider.setWorkingAcademicYear(y.label);
-                    } else {
-                      final updated = AcademicYearConfig(label: y.label, startMonth: y.startMonth, endMonth: y.endMonth, status: newStatus);
-                      await provider.addAcademicYear(updated);
-                    }
-                    setState(() {});
-                  },
+                child: Text(
+                  isCurrent ? 'CURRENT WORKING' : (isArchived ? 'ARCHIVED' : 'ACTIVE'),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: isCurrent ? const Color(0xFF059669) : (isArchived ? const Color(0xFF64748B) : const Color(0xFF2563EB)),
+                  ),
                 ),
               ),
-            ],
-          ),
-
-          // Row 3: Months label
-          Row(
-            children: [
-              const Icon(Icons.schedule_rounded, size: 14, color: Color(0xFF64748B)),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
               Text(
-                'Months: ${y.startMonth} \u2192 ${y.endMonth}',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF64748B)),
+                '${y.startMonth.length >= 3 ? y.startMonth.substring(0, 3).toUpperCase() : y.startMonth} - ${y.endMonth.length >= 3 ? y.endMonth.substring(0, 3).toUpperCase() : y.endMonth}',
+                style: const TextStyle(fontSize: 10.5, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
               ),
             ],
           ),
 
-          // Row 4: 3 Mini Stat Boxes
+          // Row 3: 3 Mini Stat Boxes
           Row(
             children: [
-              Expanded(
-                child: _buildMiniStatBox('STUDENTS', '$yearStudentsCount', const Color(0xFFEFF6FF), const Color(0xFFBFDBFE), const Color(0xFF1D4ED8)),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildMiniStatBox('CLASSES', '$yearClassesCount', const Color(0xFFEEF2FF), const Color(0xFFC7D2FE), const Color(0xFF4338CA)),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildMiniStatBox('STAFF', '$yearStaffCount', const Color(0xFFECFDF5), const Color(0xFFA7F3D0), const Color(0xFF047857)),
-              ),
+              Expanded(child: _buildMiniStatBox('STUDENTS', '$yearStudentsCount', const Color(0xFFF8FAFC), const Color(0xFFE2E8F0), const Color(0xFF0F172A))),
+              const SizedBox(width: 6),
+              Expanded(child: _buildMiniStatBox('CLASSES', '$yearClassesCount', const Color(0xFFF8FAFC), const Color(0xFFE2E8F0), const Color(0xFF0F172A))),
+              const SizedBox(width: 6),
+              Expanded(child: _buildMiniStatBox('STAFF', '$yearStaffCount', const Color(0xFFF8FAFC), const Color(0xFFE2E8F0), const Color(0xFF0F172A))),
             ],
           ),
         ],
@@ -1493,13 +1386,21 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
 
   Widget _buildMiniStatBox(String label, String value, Color bg, Color border, Color text) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8), border: Border.all(color: border)),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: border),
+      ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(label, style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: text)),
+          Text(label, style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF64748B), letterSpacing: 0.5)),
           const SizedBox(height: 2),
-          Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: text)),
+          Text(
+            value,
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: text, fontFeatures: const [FontFeature.tabularFigures()]),
+          ),
         ],
       ),
     );
@@ -1509,7 +1410,7 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
     final label = _yearLabelCtrl.text.trim();
     if (!RegExp(r'^\d{4}-\d{4}$').hasMatch(label)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid Format! Please use format YYYY-YYYY (e.g. 2025-2026).'), backgroundColor: Colors.red),
+        const SnackBar(content: Text('Invalid Format! Please use format YYYY-YYYY (e.g. 2026-2027).'), backgroundColor: Colors.red),
       );
       return;
     }
@@ -1526,10 +1427,11 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
       await provider.setWorkingAcademicYear(label);
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Academic Year "$label" saved successfully!'), backgroundColor: const Color(0xFF059669)),
-    );
+    _yearLabelCtrl.clear();
     setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Academic Year "$label" applied successfully!'), backgroundColor: const Color(0xFF059669)),
+    );
   }
 
   // ========================================================================
@@ -1538,435 +1440,408 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
   Widget _buildAddStaffTab(InstitutionProvider provider) {
     final categories = provider.staffCategories;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Section 1: Staff Categories Banner
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFECFDF5).withOpacity(0.5),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFA7F3D0)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: const [
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 880),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top Category Bar
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFBBF7D0)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Icon(Icons.layers_rounded, color: Color(0xFF047857), size: 18),
-                        SizedBox(width: 8),
-                        Text('Staff Categories', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF065F46))),
-                      ],
-                    ),
-                    Text('Add categories here or click edit to customize fields', style: TextStyle(fontSize: 11, color: Color(0xFF047857))),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // Inline Category Add Form
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    SizedBox(
-                      width: 220,
-                      child: TextField(
-                        controller: _catNameCtrl,
-                        decoration: const InputDecoration(
-                          hintText: 'Category Name (e.g. Drivers)',
-                          fillColor: Colors.white,
-                          filled: true,
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                        ),
-                      ),
-                    ),
-                    SizedBox(
-                      width: 80,
-                      child: TextField(
-                        controller: _catOrderCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          hintText: 'Order',
-                          fillColor: Colors.white,
-                          filled: true,
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFCBD5E1))),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Checkbox(
-                            value: _catPublic,
-                            activeColor: const Color(0xFF059669),
-                            onChanged: (v) => setState(() => _catPublic = v ?? true),
-                          ),
-                          const Text('Public', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
-                        ],
-                      ),
-                    ),
-                    ElevatedButton.icon(
-                      onPressed: () async {
-                        final catName = _catNameCtrl.text.trim();
-                        if (catName.isEmpty) return;
-                        final order = int.tryParse(_catOrderCtrl.text.trim()) ?? (categories.length + 1);
-                        final newCat = StaffCategory(id: catName, name: catName, order: order, showPublic: _catPublic, isCore: false);
-                        await provider.saveStaffCategory(newCat);
-                        _catNameCtrl.clear();
-                        _catOrderCtrl.text = '${categories.length + 2}';
-                        setState(() {});
-                      },
-                      icon: const Icon(Icons.add, size: 16),
-                      label: const Text('Add', style: TextStyle(fontWeight: FontWeight.bold)),
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                const Divider(color: Color(0xFFD1FAE5)),
-
-                // Category Pills List
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: categories.map((cat) {
-                    final isCore = cat.isCore;
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: isCore ? const Color(0xFFBFDBFE) : const Color(0xFFA7F3D0)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(cat.name, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isCore ? const Color(0xFF1E3A8A) : const Color(0xFF064E3B))),
-                          const SizedBox(width: 6),
-                          if (isCore)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(4)),
-                              child: const Text('DEFAULT', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF1D4ED8))),
-                            ),
-                          const SizedBox(width: 4),
-                          Text('#${cat.order}', style: const TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF94A3B8))),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(color: cat.showPublic ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(4)),
-                            child: Text(cat.showPublic ? 'Public' : 'Hidden', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: cat.showPublic ? const Color(0xFF047857) : const Color(0xFF64748B))),
-                          ),
-                          const SizedBox(width: 6),
-                          InkWell(
-                            onTap: () => _showEditStaffCategoryModal(cat, provider),
-                            child: const Icon(Icons.edit_outlined, size: 14, color: Color(0xFF2563EB)),
-                          ),
-                          if (!isCore) ...[
-                            const SizedBox(width: 4),
-                            InkWell(
-                              onTap: () async {
-                                final confirmed = await _confirmAction(context, title: 'Delete Category', message: 'Delete staff category "${cat.name}"?', confirmLabel: 'Delete');
-                                if (confirmed) {
-                                  await provider.deleteStaffCategory(cat.id);
-                                  setState(() {});
-                                }
-                              },
-                              child: const Icon(Icons.delete_outline, size: 14, color: Colors.red),
-                            ),
-                          ],
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Section 2: Add New Staff Form Card
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-              boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 10, offset: Offset(0, 4))],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Add New Staff', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                        SizedBox(height: 4),
-                        Text('Select a category below to automatically load its configured input fields.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                      ],
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFA7F3D0))),
-                      child: Text('Category: $_addStaffType', style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF047857))),
-                    ),
-                  ],
-                ),
-                const Divider(height: 24),
-
-                // 1. Category / Type Selector Sub-card
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: DropdownButtonFormField<String>(
-                          value: categories.any((c) => c.name == _addStaffType) ? _addStaffType : (categories.isNotEmpty ? categories.first.name : 'Teacher'),
-                          decoration: const InputDecoration(labelText: '1. Select Staff Category (Type) *', border: OutlineInputBorder(), isDense: true, fillColor: Colors.white, filled: true),
-                          items: categories.map((c) => DropdownMenuItem(value: c.name, child: Text(c.name, style: const TextStyle(fontWeight: FontWeight.bold)))).toList(),
-                          onChanged: (v) => setState(() => _addStaffType = v ?? 'Teacher'),
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        flex: 1,
-                        child: TextField(
-                          controller: _addStaffOrderCtrl,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(labelText: 'Display Order (Public)', border: OutlineInputBorder(), isDense: true, fillColor: Colors.white, filled: true),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Staff Photo Row
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
-                  child: Row(
-                    children: [
-                      const CircleAvatar(
-                        radius: 26,
-                        backgroundColor: Color(0xFFE2E8F0),
-                        child: Icon(Icons.person, size: 28, color: Color(0xFF94A3B8)),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
-                            Text('Staff Photo (Upload & Mobile Camera) (Max 50KB)', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
-                            SizedBox(height: 2),
-                            Text('Supported formats: JPG, PNG, WEBP', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                        const Row(
+                          children: [
+                            Icon(Icons.layers_rounded, color: Color(0xFF047857), size: 16),
+                            SizedBox(width: 6),
+                            Text('Staff Categories', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF065F46))),
                           ],
                         ),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: () => setState(() => _addStaffPhotoUrlCtrl.text = 'camera_photo.jpg'),
-                        icon: const Icon(Icons.camera_alt_outlined, size: 15),
-                        label: const Text('Camera', style: TextStyle(fontSize: 12)),
-                      ),
-                      const SizedBox(width: 8),
-                      OutlinedButton.icon(
-                        onPressed: () => setState(() => _addStaffPhotoUrlCtrl.text = 'assets/images/logo.png'),
-                        icon: const Icon(Icons.upload_file_outlined, size: 15),
-                        label: const Text('Upload', style: TextStyle(fontSize: 12)),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Form Fields
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _addStaffNameCtrl,
-                        decoration: const InputDecoration(labelText: '2. Full Name *', border: OutlineInputBorder()),
-                      ),
+                        Text('${categories.length} Categories Active', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF047857))),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextField(
-                        controller: _addStaffDesigCtrl,
-                        decoration: const InputDecoration(labelText: '3. Role / Designation / Subject *', border: OutlineInputBorder()),
-                      ),
+                    const SizedBox(height: 10),
+
+                    // Inline Add Category Form
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 180,
+                          child: TextField(
+                            controller: _catNameCtrl,
+                            decoration: const InputDecoration(
+                              hintText: 'Category Name (e.g. Drivers)',
+                              fillColor: Colors.white,
+                              filled: true,
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            ),
+                          ),
+                        ),
+                        SizedBox(
+                          width: 70,
+                          child: TextField(
+                            controller: _catOrderCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              hintText: 'Order',
+                              fillColor: Colors.white,
+                              filled: true,
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                            ),
+                          ),
+                        ),
+                        ElevatedButton.icon(
+                          onPressed: () async {
+                            final catName = _catNameCtrl.text.trim();
+                            if (catName.isEmpty) return;
+                            final order = int.tryParse(_catOrderCtrl.text.trim()) ?? (categories.length + 1);
+                            final newCat = StaffCategory(id: catName, name: catName, order: order, showPublic: _catPublic, isCore: false);
+                            await provider.saveStaffCategory(newCat);
+                            _catNameCtrl.clear();
+                            _catOrderCtrl.text = '${provider.staffCategories.length + 1}';
+                            setState(() {});
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Staff Category "$catName" added!'), backgroundColor: const Color(0xFF059669)),
+                            );
+                          },
+                          icon: const Icon(Icons.add, size: 15),
+                          label: const Text('Add Category', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF059669),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Category Chips List
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: categories.map((cat) {
+                        final isCore = cat.isCore;
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: isCore ? const Color(0xFF93C5FD) : const Color(0xFFA7F3D0)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(cat.name, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: isCore ? const Color(0xFF1E40AF) : const Color(0xFF065F46))),
+                              if (isCore) ...[
+                                const SizedBox(width: 4),
+                                const Text('(DEFAULT)', style: TextStyle(fontSize: 9, color: Color(0xFF94A3B8), fontWeight: FontWeight.bold)),
+                              ] else ...[
+                                const SizedBox(width: 4),
+                                InkWell(
+                                  onTap: () => _showEditStaffCategoryModal(cat, provider),
+                                  child: const Icon(Icons.edit, size: 13, color: Color(0xFF0284C7)),
+                                ),
+                                const SizedBox(width: 4),
+                                InkWell(
+                                  onTap: () async {
+                                    final ok = await _confirmAction('Delete Category', 'Delete "${cat.name}" category?');
+                                    if (ok) {
+                                      await provider.deleteStaffCategory(cat.id);
+                                      setState(() {});
+                                    }
+                                  },
+                                  child: const Icon(Icons.close, size: 13, color: Colors.red),
+                                ),
+                              ],
+                            ],
+                          ),
+                        );
+                      }).toList(),
                     ),
                   ],
                 ),
-                const SizedBox(height: 14),
+              ),
+              const SizedBox(height: 16),
 
-                Row(
+              // Add New Staff Form Card
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: const [BoxShadow(color: Color(0x080F172A), blurRadius: 8, offset: Offset(0, 2))],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _addStaffPhoneCtrl,
-                        keyboardType: TextInputType.phone,
-                        decoration: const InputDecoration(labelText: '4. Phone Number', border: OutlineInputBorder()),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextField(
-                        controller: _addStaffEmailCtrl,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: const InputDecoration(labelText: '5. Login Email (For Portal Login)', border: OutlineInputBorder()),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
+                    const Text('Add New Staff Member', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                    const SizedBox(height: 16),
 
-                TextField(
-                  controller: _addStaffPasswordCtrl,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: '6. Password (For Portal Login)', border: OutlineInputBorder(), hintText: 'Set portal login password'),
-                ),
-                const SizedBox(height: 16),
-
-                // Duty Classes Multi-select
-                const Text('Assigned Duty Classes', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: provider.classes.map((c) {
-                    final isSel = _addStaffAssignedClasses.contains(c);
-                    return FilterChip(
-                      selected: isSel,
-                      label: Text(c, style: TextStyle(fontSize: 12, fontWeight: isSel ? FontWeight.bold : FontWeight.normal)),
-                      onSelected: (val) {
-                        setState(() {
-                          if (val) _addStaffAssignedClasses.add(c); else _addStaffAssignedClasses.remove(c);
-                        });
+                    // 2-Column Responsive Layout
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isDesktop = constraints.maxWidth >= 640;
+                        return isDesktop
+                            ? Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Left Column: Identity & Contact
+                                  Expanded(child: _buildStaffFormLeftCol(provider)),
+                                  const SizedBox(width: 20),
+                                  // Right Column: Duties & Access
+                                  Expanded(child: _buildStaffFormRightCol(provider)),
+                                ],
+                              )
+                            : Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildStaffFormLeftCol(provider),
+                                  const SizedBox(height: 16),
+                                  _buildStaffFormRightCol(provider),
+                                ],
+                              );
                       },
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 16),
+                    ),
+                    const SizedBox(height: 20),
 
-                // 4-Portal Access Permissions
-                const Text('Portal Access Permissions', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 8,
-                  children: [
-                    _buildSwitchPill('Collection Portal', _addStaffCanCollect, (v) => setState(() => _addStaffCanCollect = v)),
-                    _buildSwitchPill('Worksheet Portal', _addStaffCanWorksheet, (v) => setState(() => _addStaffCanWorksheet = v)),
-                    _buildSwitchPill('Result Portal', _addStaffCanResults, (v) => setState(() => _addStaffCanResults = v)),
-                    _buildSwitchPill('Admin Access', _addStaffCanAdmin, (v) => setState(() => _addStaffCanAdmin = v)),
+                    // Submit Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          final name = _addStaffNameCtrl.text.trim();
+                          if (name.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter Staff Full Name!'), backgroundColor: Colors.red));
+                            return;
+                          }
+
+                          final staff = Staff(
+                            id: 'st_${DateTime.now().millisecondsSinceEpoch}',
+                            name: name,
+                            role: _addStaffType.toUpperCase() == 'MANAGEMENT' ? 'ADMIN' : 'TEACHER',
+                            designation: _addStaffDesigCtrl.text.trim().isNotEmpty ? _addStaffDesigCtrl.text.trim() : _addStaffType,
+                            type: _addStaffType,
+                            displayOrder: int.tryParse(_addStaffOrderCtrl.text.trim()) ?? 999,
+                            isActive: true,
+                            phone: _addStaffPhoneCtrl.text.trim(),
+                            email: _addStaffEmailCtrl.text.trim(),
+                            assignedClass: _addStaffAssignedClasses.join(', '),
+                            assignedClasses: _addStaffAssignedClasses.toList(),
+                            upiAccountName: _addStaffUpiAccCtrl.text.trim(),
+                            upiId: _addStaffUpiIdCtrl.text.trim(),
+                            hasCollectionAccess: _addStaffCanCollect,
+                            hasWorksheetAccess: _addStaffCanWorksheet,
+                            hasResultAccess: _addStaffCanResults,
+                            hasAdminAccess: _addStaffCanAdmin,
+                          );
+
+                          await provider.addStaff(staff);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Staff member "${staff.name}" registered successfully!'), backgroundColor: const Color(0xFF059669)),
+                          );
+
+                          // Clear form
+                          _addStaffNameCtrl.clear();
+                          _addStaffDesigCtrl.clear();
+                          _addStaffPhoneCtrl.clear();
+                          _addStaffEmailCtrl.clear();
+                          _addStaffPasswordCtrl.clear();
+                          _addStaffAssignedClasses.clear();
+
+                          // Jump to Tab 4 (Staff & Management)
+                          setState(() {
+                            _currentModuleIndex = 0;
+                            _currentSubIndex = 3;
+                          });
+                        },
+                        icon: const Icon(Icons.check, size: 18),
+                        label: const Text('Save Staff Member', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF059669),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 24),
-
-                // Submit Button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      final name = _addStaffNameCtrl.text.trim();
-                      if (name.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter Staff Full Name!'), backgroundColor: Colors.red));
-                        return;
-                      }
-
-                      final staff = Staff(
-                        id: 'st_${DateTime.now().millisecondsSinceEpoch}',
-                        name: name,
-                        role: _addStaffType.toUpperCase() == 'MANAGEMENT' ? 'ADMIN' : 'TEACHER',
-                        designation: _addStaffDesigCtrl.text.trim().isNotEmpty ? _addStaffDesigCtrl.text.trim() : _addStaffType,
-                        type: _addStaffType,
-                        displayOrder: int.tryParse(_addStaffOrderCtrl.text.trim()) ?? 999,
-                        isActive: true,
-                        phone: _addStaffPhoneCtrl.text.trim(),
-                        email: _addStaffEmailCtrl.text.trim(),
-                        assignedClass: _addStaffAssignedClasses.join(', '),
-                        assignedClasses: _addStaffAssignedClasses.toList(),
-                        upiAccountName: _addStaffUpiAccCtrl.text.trim(),
-                        upiId: _addStaffUpiIdCtrl.text.trim(),
-                        hasCollectionAccess: _addStaffCanCollect,
-                        hasWorksheetAccess: _addStaffCanWorksheet,
-                        hasResultAccess: _addStaffCanResults,
-                        hasAdminAccess: _addStaffCanAdmin,
-                      );
-
-                      await provider.addStaff(staff);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Staff member "${staff.name}" registered successfully!'), backgroundColor: const Color(0xFF059669)),
-                      );
-
-                      // Clear form
-                      _addStaffNameCtrl.clear();
-                      _addStaffDesigCtrl.clear();
-                      _addStaffPhoneCtrl.clear();
-                      _addStaffEmailCtrl.clear();
-                      _addStaffPasswordCtrl.clear();
-                      _addStaffAssignedClasses.clear();
-
-                      // Jump to Tab 4 (Staff & Management)
-                      setState(() {
-                        _currentModuleIndex = 0;
-                        _currentSubIndex = 3;
-                      });
-                    },
-                    icon: const Icon(Icons.check, size: 18),
-                    label: const Text('Save Staff Member', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF059669),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildStaffFormLeftCol(InstitutionProvider provider) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Category Selection
+        DropdownButtonFormField<String>(
+          value: provider.staffCategories.any((c) => c.name == _addStaffType)
+              ? _addStaffType
+              : (provider.staffCategories.isNotEmpty ? provider.staffCategories.first.name : 'Teacher'),
+          decoration: const InputDecoration(labelText: 'Staff Category *', border: OutlineInputBorder(), isDense: true),
+          items: provider.staffCategories
+              .map((c) => DropdownMenuItem(value: c.name, child: Text(c.name, style: const TextStyle(fontSize: 13))))
+              .toList(),
+          onChanged: (val) => setState(() => _addStaffType = val ?? 'Teacher'),
+        ),
+        const SizedBox(height: 12),
+
+        // Display Order & Full Name
+        Row(
+          children: [
+            Expanded(
+              flex: 3,
+              child: TextField(
+                controller: _addStaffNameCtrl,
+                decoration: const InputDecoration(labelText: 'Full Name *', hintText: 'e.g. Sanjid Ustad', border: OutlineInputBorder(), isDense: true),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 1,
+              child: TextField(
+                controller: _addStaffOrderCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Order #', border: OutlineInputBorder(), isDense: true),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // Designation & Samastha Reg
+        TextField(
+          controller: _addStaffDesigCtrl,
+          decoration: const InputDecoration(labelText: 'Designation / Title', hintText: 'e.g. Headmaster, Swadar', border: OutlineInputBorder(), isDense: true),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _addStaffSamasthaCtrl,
+          decoration: const InputDecoration(labelText: 'Samastha Reg # (Optional)', hintText: 'e.g. SAM-1024', border: OutlineInputBorder(), isDense: true),
+        ),
+        const SizedBox(height: 12),
+
+        // Phone & Email
+        TextField(
+          controller: _addStaffPhoneCtrl,
+          keyboardType: TextInputType.phone,
+          decoration: const InputDecoration(labelText: 'Phone / WhatsApp *', hintText: 'e.g. 9876543210', border: OutlineInputBorder(), isDense: true),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _addStaffEmailCtrl,
+          keyboardType: TextInputType.emailAddress,
+          decoration: const InputDecoration(labelText: 'Email Address', hintText: 'e.g. staff@institution.org', border: OutlineInputBorder(), isDense: true),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _addStaffPasswordCtrl,
+          obscureText: true,
+          decoration: const InputDecoration(labelText: 'Login Password', hintText: 'Temporary Password', border: OutlineInputBorder(), isDense: true),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStaffFormRightCol(InstitutionProvider provider) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Assigned Duty Classes
+        const Text('Assigned Duty Classes', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: provider.classes.map((cls) {
+            final isSel = _addStaffAssignedClasses.contains(cls);
+            return FilterChip(
+              selected: isSel,
+              selectedColor: const Color(0xFFDBEAFE),
+              checkmarkColor: const Color(0xFF1D4ED8),
+              label: Text(cls, style: TextStyle(fontSize: 11.5, fontWeight: isSel ? FontWeight.bold : FontWeight.normal, color: isSel ? const Color(0xFF1E40AF) : const Color(0xFF334155))),
+              onSelected: (val) {
+                setState(() {
+                  if (val) _addStaffAssignedClasses.add(cls); else _addStaffAssignedClasses.remove(cls);
+                });
+              },
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 14),
+
+        // 4-Portal Access Permissions
+        const Text('4-Portal Access Permissions', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _buildSwitchPill('Collection Portal', _addStaffCanCollect, (v) => setState(() => _addStaffCanCollect = v)),
+            _buildSwitchPill('Worksheet Portal', _addStaffCanWorksheet, (v) => setState(() => _addStaffCanWorksheet = v)),
+            _buildSwitchPill('Result Portal', _addStaffCanResults, (v) => setState(() => _addStaffCanResults = v)),
+            _buildSwitchPill('Admin Access', _addStaffCanAdmin, (v) => setState(() => _addStaffCanAdmin = v)),
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        // Cashier Personal UPI Details
+        const Text('Cashier Personal UPI (Optional)', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+        const SizedBox(height: 6),
+        TextField(
+          controller: _addStaffUpiAccCtrl,
+          decoration: const InputDecoration(labelText: 'Account Holder Name', hintText: 'e.g. Sanjid Ustad', border: OutlineInputBorder(), isDense: true),
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _addStaffUpiIdCtrl,
+          decoration: const InputDecoration(labelText: 'UPI ID / VPA', hintText: 'e.g. 9876543210@okaxis', border: OutlineInputBorder(), isDense: true),
+        ),
+      ],
     );
   }
 
   Widget _buildSwitchPill(String title, bool val, ValueChanged<bool> onChanged) {
     return InkWell(
       onTap: () => onChanged(!val),
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(8),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: val ? const Color(0xFFEFF6FF) : Colors.white,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: val ? const Color(0xFF2563EB) : const Color(0xFFCBD5E1),
-            width: val ? 1.5 : 1.0,
+            width: val ? 1.4 : 1.0,
           ),
-          boxShadow: const [
-            BoxShadow(color: Color(0x050F172A), blurRadius: 4, offset: Offset(0, 1)),
-          ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1974,13 +1849,13 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
             Icon(
               val ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
               color: val ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
-              size: 18,
+              size: 16,
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             Text(
               title,
               style: TextStyle(
-                fontSize: 12.5,
+                fontSize: 11.5,
                 fontWeight: val ? FontWeight.bold : FontWeight.w600,
                 color: val ? const Color(0xFF1E3A8A) : const Color(0xFF334155),
               ),
@@ -2000,19 +1875,21 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDlg) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           title: Text('Edit Category: ${cat.name}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Category Name *', border: OutlineInputBorder())),
-              const SizedBox(height: 12),
-              TextField(controller: orderCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Display Order', border: OutlineInputBorder())),
-              const SizedBox(height: 12),
+              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Category Name *', border: OutlineInputBorder(), isDense: true)),
+              const SizedBox(height: 10),
+              TextField(controller: orderCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Display Order', border: OutlineInputBorder(), isDense: true)),
+              const SizedBox(height: 10),
               CheckboxListTile(
                 value: isPub,
-                title: const Text('Public Display', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                 onChanged: (v) => setDlg(() => isPub = v ?? true),
+                title: const Text('Show on Public Website Directory', style: TextStyle(fontSize: 12.5)),
+                dense: true,
+                contentPadding: EdgeInsets.zero,
               ),
             ],
           ),
@@ -2020,11 +1897,10 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
             ElevatedButton(
               onPressed: () async {
-                final updated = cat.copyWith(
-                  name: nameCtrl.text.trim(),
-                  order: int.tryParse(orderCtrl.text.trim()) ?? cat.order,
-                  showPublic: isPub,
-                );
+                final newName = nameCtrl.text.trim();
+                if (newName.isEmpty) return;
+                final newOrd = int.tryParse(orderCtrl.text.trim()) ?? cat.order;
+                final updated = cat.copyWith(name: newName, order: newOrd, showPublic: isPub);
                 await provider.saveStaffCategory(updated);
                 Navigator.pop(ctx);
                 setState(() {});
@@ -2038,315 +1914,279 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
   }
 
   // ========================================================================
-  // 1D. STAFF & MANAGEMENT (#staff-management / staff-management-page)
+  // 1D. STAFF & MANAGEMENT DIRECTORY (#staff-management / staff-management-page)
   // ========================================================================
   Widget _buildStaffDirectoryTab(InstitutionProvider provider) {
-    final search = _staffSearchCtrl.text.trim().toLowerCase();
-    final categories = provider.staffCategories;
+    final setting = provider.setting;
+    final staffList = provider.staff;
+    final search = _staffSearchCtrl.text.toLowerCase().trim();
 
-    bool matches(Staff s) {
+    // Filter staff by search query and category
+    final filtered = staffList.where((st) {
+      if (search.isNotEmpty) {
+        final matches = st.name.toLowerCase().contains(search) ||
+            st.phone.contains(search) ||
+            st.designation.toLowerCase().contains(search) ||
+            st.samasthaRegNo.toLowerCase().contains(search);
+        if (!matches) return false;
+      }
+
       if (_staffTypeFilter != 'all') {
-        if (_staffTypeFilter.toLowerCase() == 'teacher' && s.type.toLowerCase() != 'teacher' && s.role != 'TEACHER') return false;
-        if (_staffTypeFilter.toLowerCase() == 'management' && s.type.toLowerCase() != 'management' && s.role != 'ADMIN') return false;
+        if (_staffTypeFilter.toLowerCase() == 'teacher' && st.type.toLowerCase() != 'teacher' && st.role.toLowerCase() != 'teacher') {
+          return false;
+        }
+        if (_staffTypeFilter.toLowerCase() == 'management' && st.type.toLowerCase() != 'management' && st.role.toLowerCase() != 'admin') {
+          return false;
+        }
         if (_staffTypeFilter.toLowerCase() != 'teacher' && _staffTypeFilter.toLowerCase() != 'management') {
-          if (s.type.toLowerCase() != _staffTypeFilter.toLowerCase()) return false;
+          if (st.type.toLowerCase() != _staffTypeFilter.toLowerCase()) return false;
         }
       }
-      if (search.isEmpty) return true;
-      final haystack = '${s.name} ${s.designation} ${s.phone} ${s.email} ${s.type}'.toLowerCase();
-      return haystack.contains(search);
-    }
+      return true;
+    }).toList();
 
-    final activeStaff = provider.staffList.where((s) => s.isActive && matches(s)).toList();
-    final inactiveStaff = provider.staffList.where((s) => !s.isActive && matches(s)).toList();
+    // Sort by order
+    filtered.sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
 
-    // Sort by display order
-    activeStaff.sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
-    inactiveStaff.sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
+    final activeStaff = filtered.where((st) => st.isActive).toList();
+    final inactiveStaff = filtered.where((st) => !st.isActive).toList();
 
-    final activeTeachers = activeStaff.where((s) => s.type == 'Teacher' || s.role == 'TEACHER').toList();
-    final activeManagement = activeStaff.where((s) => s.type == 'Management' || s.role == 'ADMIN').toList();
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final cols = constraints.maxWidth >= 960 ? 3 : (constraints.maxWidth >= 600 ? 2 : 1);
-
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1200),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header Card
+              // Header Filter Bar
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(16),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: const Color(0xFFE2E8F0)),
-                  boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 8, offset: Offset(0, 2))],
+                  boxShadow: const [BoxShadow(color: Color(0x060F172A), blurRadius: 6, offset: Offset(0, 2))],
                 ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Staff & Management', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                            SizedBox(height: 3),
-                            Text('Manage active staff profiles, duty class assignments, and UPI payment accounts.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                          ],
-                        ),
-                        ElevatedButton.icon(
-                          onPressed: () => setState(() {
-                            _currentModuleIndex = 0;
-                            _currentSubIndex = 2; // Jump to Tab 3 (Add Staff)
-                          }),
-                          icon: const Icon(Icons.person_add_alt_1_rounded, size: 16),
-                          label: const Text('Add New Staff', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFECFDF5),
-                            foregroundColor: const Color(0xFF047857),
-                            elevation: 0,
-                            side: const BorderSide(color: Color(0xFFA7F3D0)),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Divider(height: 20),
-
-                    // Filter row
                     Row(
                       children: [
                         Expanded(
                           child: TextField(
                             controller: _staffSearchCtrl,
-                            onChanged: (_) => setState(() {}),
-                            decoration: const InputDecoration(
-                              hintText: 'Filter by name, role, phone or email...',
-                              prefixIcon: Icon(Icons.search, size: 18),
-                              fillColor: Colors.white,
-                              filled: true,
-                              border: OutlineInputBorder(),
+                            decoration: InputDecoration(
+                              hintText: 'Search by staff name, designation, phone, or reg #...',
+                              prefixIcon: const Icon(Icons.search, size: 18),
+                              suffixIcon: _staffSearchCtrl.text.isNotEmpty
+                                  ? IconButton(icon: const Icon(Icons.clear, size: 16), onPressed: () => setState(() => _staffSearchCtrl.clear()))
+                                  : null,
+                              border: const OutlineInputBorder(),
                               isDense: true,
-                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                             ),
+                            onChanged: (_) => setState(() {}),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        SizedBox(
-                          width: 160,
-                          child: DropdownButtonFormField<String>(
-                            value: _staffTypeFilter,
-                            decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, fillColor: Colors.white, filled: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
-                            items: [
-                              const DropdownMenuItem(value: 'all', child: Text('All Types', style: TextStyle(fontSize: 13))),
-                              ...categories.map((c) => DropdownMenuItem(value: c.name, child: Text(c.name, style: const TextStyle(fontSize: 13)))),
-                            ],
-                            onChanged: (v) => setState(() => _staffTypeFilter = v ?? 'all'),
+                        const SizedBox(width: 10),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _currentModuleIndex = 0;
+                              _currentSubIndex = 2; // Jump to Add Staff tab
+                            });
+                          },
+                          icon: const Icon(Icons.person_add_alt_1, size: 16),
+                          label: const Text('Add Staff', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF059669),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
                         ),
                       ],
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
+                    const SizedBox(height: 10),
 
-              // Section: Active Teachers
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                  boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 10, offset: Offset(0, 4))],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: const [
-                        Icon(Icons.school_rounded, color: Color(0xFF2563EB), size: 20),
-                        SizedBox(width: 8),
-                        Text('Active Teachers', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
-                      ],
-                    ),
-                    const Divider(height: 24, color: Color(0xFFDBEAFE)),
-                    if (activeTeachers.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.all(20),
-                        child: Text('No active teachers found.', style: TextStyle(fontStyle: FontStyle.italic, color: Color(0xFF64748B))),
-                      )
-                    else
-                      GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: activeTeachers.length,
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: cols,
-                          crossAxisSpacing: 14,
-                          mainAxisSpacing: 14,
-                          childAspectRatio: 1.25,
-                        ),
-                        itemBuilder: (ctx, idx) => _buildStaffCard(activeTeachers[idx], provider, true),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Section: Active Management
-              if (activeManagement.isNotEmpty) ...[
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                    boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 10, offset: Offset(0, 4))],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: const [
-                          Icon(Icons.badge_rounded, color: Color(0xFF7C3AED), size: 20),
-                          SizedBox(width: 8),
-                          Text('Active Management', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF5B21B6))),
+                    // Category Filter Tabs
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _buildFilterChip('All Staff (${staffList.length})', 'all'),
+                          _buildFilterChip('Teachers', 'teacher'),
+                          _buildFilterChip('Management', 'management'),
+                          ...provider.staffCategories
+                              .where((c) => c.name.toLowerCase() != 'teacher' && c.name.toLowerCase() != 'management')
+                              .map((c) => _buildFilterChip(c.name, c.name.toLowerCase())),
                         ],
                       ),
-                      const Divider(height: 24, color: Color(0xFFE9D5FF)),
-                      GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: activeManagement.length,
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: cols,
-                          crossAxisSpacing: 14,
-                          mainAxisSpacing: 14,
-                          childAspectRatio: 1.25,
-                        ),
-                        itemBuilder: (ctx, idx) => _buildStaffCard(activeManagement[idx], provider, true),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-              ],
-
-              // Collapsible Inactive Staff Accordion
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                  boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 8, offset: Offset(0, 2))],
-                ),
-                child: ExpansionTile(
-                  leading: const Icon(Icons.person_off_rounded, color: Color(0xFF64748B)),
-                  title: Text(
-                    'View Inactive Staff (${inactiveStaff.length})',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF334155)),
-                  ),
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: inactiveStaff.isEmpty
-                          ? const Center(child: Text('No inactive staff profiles.', style: TextStyle(fontStyle: FontStyle.italic, color: Color(0xFF64748B))))
-                          : GridView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: inactiveStaff.length,
-                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: cols,
-                                crossAxisSpacing: 14,
-                                mainAxisSpacing: 14,
-                                childAspectRatio: 1.25,
-                              ),
-                              itemBuilder: (ctx, idx) => _buildStaffCard(inactiveStaff[idx], provider, false),
-                            ),
                     ),
                   ],
                 ),
               ),
+              const SizedBox(height: 16),
+
+              // Staff Cards Grid
+              if (activeStaff.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(40),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
+                  child: const Text('No staff members found matching criteria.', style: TextStyle(color: Color(0xFF64748B), fontStyle: FontStyle.italic)),
+                )
+              else
+                LayoutBuilder(
+                  builder: (ctx, gridConstraints) {
+                    final cols = gridConstraints.maxWidth >= 960 ? 3 : (gridConstraints.maxWidth >= 600 ? 2 : 1);
+                    return GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: activeStaff.length,
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: cols,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                        mainAxisExtent: 220, // Prevents bottom overflow on staff cards
+                      ),
+                      itemBuilder: (ctx, idx) => _buildStaffCard(activeStaff[idx], provider, setting, true),
+                    );
+                  },
+                ),
+
+              // Collapsible Inactive Staff Accordion
+              if (inactiveStaff.isNotEmpty) ...[
+                const SizedBox(height: 24),
+                InkWell(
+                  onTap: () => setState(() => _showInactiveStaff = !_showInactiveStaff),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.archive_outlined, size: 18, color: Color(0xFF64748B)),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Inactive Staff Archive (${inactiveStaff.length})',
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+                            ),
+                          ],
+                        ),
+                        Icon(_showInactiveStaff ? Icons.expand_less : Icons.expand_more, size: 20, color: const Color(0xFF64748B)),
+                      ],
+                    ),
+                  ),
+                ),
+                if (_showInactiveStaff) ...[
+                  const SizedBox(height: 12),
+                  LayoutBuilder(
+                    builder: (ctx, gridConstraints) {
+                      final cols = gridConstraints.maxWidth >= 960 ? 3 : (gridConstraints.maxWidth >= 600 ? 2 : 1);
+                      return GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: inactiveStaff.length,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: cols,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                          mainAxisExtent: 220,
+                        ),
+                        itemBuilder: (ctx, idx) => _buildStaffCard(inactiveStaff[idx], provider, setting, false),
+                      );
+                    },
+                  ),
+                ],
+              ],
             ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
-  Widget _buildStaffCard(Staff st, InstitutionProvider provider, bool isActive) {
-    final assignedList = st.assignedClasses.isNotEmpty
-        ? st.assignedClasses
-        : (st.assignedClass.isNotEmpty ? st.assignedClass.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList() : <String>[]);
+  Widget _buildFilterChip(String label, String value) {
+    final isSel = _staffTypeFilter == value;
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: FilterChip(
+        selected: isSel,
+        selectedColor: const Color(0xFFDBEAFE),
+        checkmarkColor: const Color(0xFF1D4ED8),
+        label: Text(label, style: TextStyle(fontSize: 11.5, fontWeight: isSel ? FontWeight.bold : FontWeight.w500, color: isSel ? const Color(0xFF1E40AF) : const Color(0xFF475569))),
+        onSelected: (_) => setState(() => _staffTypeFilter = value),
+      ),
+    );
+  }
+
+  Widget _buildStaffCard(Staff st, InstitutionProvider provider, dynamic setting, bool isActive) {
+    final assigned = st.assignedClasses.isNotEmpty ? st.assignedClasses : (st.assignedClass.isNotEmpty ? st.assignedClass.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList() : <String>[]);
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 6, offset: Offset(0, 2))],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isActive ? const Color(0xFFE2E8F0) : const Color(0xFFCBD5E1)),
+        boxShadow: const [BoxShadow(color: Color(0x060F172A), blurRadius: 6, offset: Offset(0, 2))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Top Row: Avatar, Name, View Button
+          // Top Row: Avatar + Name + View Button
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               CircleAvatar(
-                radius: 20,
-                backgroundColor: const Color(0xFFE2E8F0),
-                child: Text(
-                  st.name.isNotEmpty ? st.name[0].toUpperCase() : 'U',
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF475569)),
-                ),
+                radius: 18,
+                backgroundColor: const Color(0xFF2563EB),
+                foregroundColor: Colors.white,
+                child: Text(st.name.isNotEmpty ? st.name[0].toUpperCase() : 'U', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       st.name.toUpperCase(),
-                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5, color: Color(0xFF0F172A)),
-                      maxLines: 1,
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 2),
                     Text(
-                      st.designation.isNotEmpty ? st.designation : st.role,
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
-                      maxLines: 1,
+                      st.designation.isNotEmpty ? st.designation : st.type,
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
+              // View Button (Staff ID Card Launcher)
               InkWell(
-                onTap: () => _showStaffProfilePreviewModal(st),
-                borderRadius: BorderRadius.circular(16),
+                onTap: () => _showStaffProfilePreviewModal(st, setting),
+                borderRadius: BorderRadius.circular(6),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: const Color(0xFFEFF6FF),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(6),
                     border: Border.all(color: const Color(0xFFBFDBFE)),
                   ),
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.visibility_outlined, size: 12, color: Color(0xFF2563EB)),
-                      SizedBox(width: 3),
-                      Text('View', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF1D4ED8))),
+                      Icon(Icons.badge_rounded, size: 13, color: Color(0xFF2563EB)),
+                      SizedBox(width: 4),
+                      Text('View', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1E40AF))),
                     ],
                   ),
                 ),
@@ -2354,126 +2194,89 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
             ],
           ),
 
-          // Classes Row
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          // Assigned Duty Classes Chips
+          if (assigned.isNotEmpty)
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: assigned.map((cls) => Container(
+                  margin: const EdgeInsets.only(right: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(4)),
+                  child: Text(cls, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                )).toList(),
+              ),
+            )
+          else
+            const Text('No classes assigned', style: TextStyle(fontSize: 10.5, color: Color(0xFF94A3B8), fontStyle: FontStyle.italic)),
+
+          // 4-Portal Permissions Pills
+          Row(
             children: [
-              const Text('CLASSES:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B), letterSpacing: 0.5)),
-              const SizedBox(height: 3),
-              if (assignedList.isEmpty)
-                const Text('No classes assigned', style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Color(0xFF94A3B8)))
-              else
-                Wrap(
-                  spacing: 4,
-                  runSpacing: 2,
-                  children: assignedList.map((c) => Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                    decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(4)),
-                    child: Text(c, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
-                  )).toList(),
-                ),
+              _buildPermPill('FEES', st.hasCollectionAccess, const Color(0xFF059669), const Color(0xFFECFDF5)),
+              const SizedBox(width: 4),
+              _buildPermPill('SHEET', st.hasWorksheetAccess, const Color(0xFF2563EB), const Color(0xFFEFF6FF)),
+              const SizedBox(width: 4),
+              _buildPermPill('RESULT', st.hasResultAccess, const Color(0xFF7C3AED), const Color(0xFFF5F3FF)),
+              const SizedBox(width: 4),
+              _buildPermPill('ADMIN', st.hasAdminAccess, const Color(0xFFD97706), const Color(0xFFFFFBEB)),
             ],
           ),
 
-          // Login Permissions Row
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          // Action Buttons Bar
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('LOGIN PERMISSIONS:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B), letterSpacing: 0.5)),
-              const SizedBox(height: 3),
-              Wrap(
-                spacing: 5,
-                runSpacing: 2,
-                children: [
-                  _buildPermPill('1. Collection', st.hasCollectionAccess, const Color(0xFF059669), const Color(0xFFECFDF5)),
-                  _buildPermPill('2. Worksheet', st.hasWorksheetAccess, const Color(0xFF0284C7), const Color(0xFFF0F9FF)),
-                  _buildPermPill('3. Result', st.hasResultAccess, const Color(0xFF4F46E5), const Color(0xFFEEF2FF)),
-                ],
+              _buildStaffActionBtn(
+                label: 'Duty & UPI',
+                icon: Icons.assignment_ind_outlined,
+                textColor: const Color(0xFF1E3A8A),
+                bgColor: const Color(0xFFEFF6FF),
+                borderColor: const Color(0xFFBFDBFE),
+                onTap: () => _showDutyModal(st, provider),
+              ),
+              _buildStaffActionBtn(
+                label: 'Edit',
+                icon: Icons.edit_outlined,
+                textColor: const Color(0xFF047857),
+                bgColor: const Color(0xFFECFDF5),
+                borderColor: const Color(0xFFA7F3D0),
+                onTap: () => _showEditStaffModal(st, provider),
+              ),
+              _buildStaffActionBtn(
+                label: 'Login',
+                icon: Icons.key_outlined,
+                textColor: const Color(0xFF4338CA),
+                bgColor: const Color(0xFFEEF2FF),
+                borderColor: const Color(0xFFC7D2FE),
+                onTap: () => _showStaffLoginModal(st),
+              ),
+              _buildStaffActionBtn(
+                label: isActive ? 'Deactivate' : 'Activate',
+                icon: isActive ? Icons.pause_circle_outline : Icons.play_circle_outline,
+                textColor: isActive ? const Color(0xFFB45309) : const Color(0xFF047857),
+                bgColor: isActive ? const Color(0xFFFFFBEB) : const Color(0xFFECFDF5),
+                borderColor: isActive ? const Color(0xFFFDE68A) : const Color(0xFFA7F3D0),
+                onTap: () async {
+                  await provider.toggleStaffActive(st.id);
+                  setState(() {});
+                },
+              ),
+              _buildStaffActionBtn(
+                label: 'Delete',
+                icon: Icons.delete_outline,
+                textColor: const Color(0xFFB91C1C),
+                bgColor: const Color(0xFFFEF2F2),
+                borderColor: const Color(0xFFFECACA),
+                onTap: () async {
+                  final ok = await _confirmAction('Delete Staff', 'Are you sure you want to delete staff member "${st.name}"?');
+                  if (ok) {
+                    await provider.deleteStaff(st.id);
+                    setState(() {});
+                  }
+                },
               ),
             ],
-          ),
-
-          // 5-Action Buttons Row (grid-cols-5)
-          Container(
-            padding: const EdgeInsets.only(top: 8),
-            decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0xFFF1F5F9)))),
-            child: Row(
-              children: [
-                // 1. Delete
-                Expanded(
-                  child: _buildStaffActionBtn(
-                    label: 'Delete',
-                    icon: Icons.delete_outline,
-                    textColor: const Color(0xFFE11D48),
-                    bgColor: const Color(0xFFFFF1F2),
-                    borderColor: const Color(0xFFFECDD3),
-                    onTap: () async {
-                      final confirmed = await _confirmAction(
-                        context,
-                        title: 'Delete Staff',
-                        message: 'Permanently remove "${st.name}"?',
-                        confirmLabel: 'Delete',
-                      );
-                      if (confirmed) {
-                        await provider.deleteStaff(st.id);
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Staff member "${st.name}" deleted.')));
-                      }
-                    },
-                  ),
-                ),
-                const SizedBox(width: 4),
-                // 2. Deactive / Active
-                Expanded(
-                  child: _buildStaffActionBtn(
-                    label: isActive ? 'Deactive' : 'Active',
-                    icon: isActive ? Icons.person_off_outlined : Icons.person_outline,
-                    textColor: isActive ? const Color(0xFFD97706) : const Color(0xFF059669),
-                    bgColor: isActive ? const Color(0xFFFFFBEB) : const Color(0xFFECFDF5),
-                    borderColor: isActive ? const Color(0xFFFDE68A) : const Color(0xFFA7F3D0),
-                    onTap: () async {
-                      await provider.toggleStaffActive(st.id);
-                      setState(() {});
-                    },
-                  ),
-                ),
-                const SizedBox(width: 4),
-                // 3. Login
-                Expanded(
-                  child: _buildStaffActionBtn(
-                    label: 'Login',
-                    icon: Icons.vpn_key_outlined,
-                    textColor: const Color(0xFF7C3AED),
-                    bgColor: const Color(0xFFF5F3FF),
-                    borderColor: const Color(0xFFDDD6FE),
-                    onTap: () => _showStaffLoginModal(st),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                // 4. Duty & ...
-                Expanded(
-                  child: _buildStaffActionBtn(
-                    label: 'Duty & ...',
-                    icon: Icons.school_outlined,
-                    textColor: const Color(0xFF4F46E5),
-                    bgColor: const Color(0xFFEEF2FF),
-                    borderColor: const Color(0xFFC7D2FE),
-                    onTap: () => _showDutyModal(st, provider),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                // 5. Edit
-                Expanded(
-                  child: _buildStaffActionBtn(
-                    label: 'Edit',
-                    icon: Icons.edit_outlined,
-                    textColor: const Color(0xFF2563EB),
-                    bgColor: const Color(0xFFEFF6FF),
-                    borderColor: const Color(0xFFBFDBFE),
-                    onTap: () => _showEditStaffModal(st, provider),
-                  ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
@@ -2482,7 +2285,7 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
 
   Widget _buildPermPill(String text, bool active, Color color, Color bg) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
       decoration: BoxDecoration(
         color: active ? bg : const Color(0xFFF1F5F9),
         borderRadius: BorderRadius.circular(4),
@@ -2511,73 +2314,337 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(6),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: BorderRadius.circular(6),
           border: Border.all(color: borderColor),
         ),
-        child: Column(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: textColor),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: textColor),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+            Icon(icon, size: 12, color: textColor),
+            const SizedBox(width: 3),
+            Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: textColor)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(label, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
-          ),
-          Expanded(
-            child: Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
-          ),
-        ],
-      ),
-    );
-  }
+  // ========================================================================
+  // 1E. DIGITAL STAFF IDENTITY CARD MODAL (LAUNCHED BY "VIEW" BUTTON)
+  // ========================================================================
+  void _showStaffProfilePreviewModal(Staff st, dynamic setting) {
+    final assigned = st.assignedClasses.isNotEmpty
+        ? st.assignedClasses
+        : (st.assignedClass.isNotEmpty ? st.assignedClass.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList() : <String>[]);
 
-  void _showStaffProfilePreviewModal(Staff st) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            CircleAvatar(radius: 18, child: Text(st.name.isNotEmpty ? st.name[0].toUpperCase() : 'U')),
-            const SizedBox(width: 10),
-            Expanded(child: Text(st.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
-          ],
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 480),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF1E3A8A), Color(0xFF0F172A)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: const [
+              BoxShadow(color: Color(0x33000000), blurRadius: 24, offset: Offset(0, 10)),
+            ],
+            border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.3), width: 1.5),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Card Top Header: Crest + Institution Name + Verified Badge
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 14),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 34,
+                          height: 34,
+                          decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
+                          clipBehavior: Clip.antiAlias,
+                          child: Image.asset(
+                            'assets/images/logo.png',
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Icon(Icons.school, size: 20, color: Color(0xFF2563EB)),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              setting.institutionName.isNotEmpty ? setting.institutionName.toUpperCase() : 'INSTITUTION FACULTY',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.6),
+                            ),
+                            const Text(
+                              'OFFICIAL FACULTY & STAFF IDENTITY CARD',
+                              style: TextStyle(color: Colors.white70, fontSize: 9.5, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.white30),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(st.isActive ? Icons.verified_user : Icons.pause_circle_filled, size: 12, color: st.isActive ? const Color(0xFF34D399) : const Color(0xFFFBBF24)),
+                          const SizedBox(width: 4),
+                          Text(
+                            st.isActive ? 'ACTIVE STAFF' : 'INACTIVE',
+                            style: TextStyle(color: st.isActive ? const Color(0xFF34D399) : const Color(0xFFFBBF24), fontSize: 9, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(color: Colors.white12, height: 1),
+
+              // Staff Identity Section
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Photo / Avatar with White Ring
+                    Container(
+                      width: 68,
+                      height: 68,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFF2563EB),
+                        border: Border.all(color: Colors.white, width: 2.5),
+                        boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 8, offset: Offset(0, 3))],
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        st.name.isNotEmpty ? st.name[0].toUpperCase() : 'S',
+                        style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.white),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            st.name.toUpperCase(),
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.3),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            st.designation.isNotEmpty ? st.designation : st.type,
+                            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF93C5FD)),
+                          ),
+                          const SizedBox(height: 5),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(color: const Color(0xFF2563EB), borderRadius: BorderRadius.circular(6)),
+                                child: Text(st.type, style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Colors.white)),
+                              ),
+                              if (st.samasthaRegNo.isNotEmpty) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                  decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(6)),
+                                  child: Text('Reg #${st.samasthaRegNo}', style: const TextStyle(fontSize: 9.5, color: Colors.white70)),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Staff Details Grid (Key Information)
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white12),
+                ),
+                child: Column(
+                  children: [
+                    _buildIdCardRow('Phone / WhatsApp', st.phone.isNotEmpty ? st.phone : 'Not Provided'),
+                    const Divider(color: Colors.white10, height: 10),
+                    _buildIdCardRow('Email Address', st.email.isNotEmpty ? st.email : 'Not Provided'),
+                    const Divider(color: Colors.white10, height: 10),
+                    _buildIdCardRow('Assigned Classes', assigned.isNotEmpty ? assigned.join(', ') : 'None'),
+                    if (st.upiId.isNotEmpty) ...[
+                      const Divider(color: Colors.white10, height: 10),
+                      _buildIdCardRow('Cashier UPI ID', '${st.upiId} (${st.upiAccountName})'),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Portal Permissions
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    Expanded(child: _buildIdCardPerm('FEES', st.hasCollectionAccess)),
+                    const SizedBox(width: 6),
+                    Expanded(child: _buildIdCardPerm('WORKSHEET', st.hasWorksheetAccess)),
+                    const SizedBox(width: 6),
+                    Expanded(child: _buildIdCardPerm('RESULTS', st.hasResultAccess)),
+                    const SizedBox(width: 6),
+                    Expanded(child: _buildIdCardPerm('ADMIN', st.hasAdminAccess)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Barcode / Auth Footer
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.04),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'SECURITY ID: ${st.id.toUpperCase()}',
+                          style: const TextStyle(fontFamily: 'monospace', fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white70),
+                        ),
+                        Text(
+                          'SESSION: ${setting.activeAcademicYear}',
+                          style: const TextStyle(fontSize: 9, color: Colors.white54),
+                        ),
+                      ],
+                    ),
+                    // Simulated Barcode graphic
+                    Row(
+                      children: List.generate(
+                        18,
+                        (i) => Container(
+                          width: (i % 3 == 0) ? 3 : ((i % 2 == 0) ? 2 : 1),
+                          height: 18,
+                          margin: const EdgeInsets.only(left: 2),
+                          color: Colors.white54,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Bottom Actions: Print & Close
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('ID Card print preview ready for "${st.name}"!'), backgroundColor: const Color(0xFF2563EB)),
+                          );
+                        },
+                        icon: const Icon(Icons.print_rounded, size: 16),
+                        label: const Text('Print ID Card', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(color: Colors.white30),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: const Color(0xFF0F172A),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        child: const Text('Close', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildInfoRow('Role & Category', '${st.type} (${st.role})'),
-            _buildInfoRow('Designation', st.designation),
-            _buildInfoRow('Phone', st.phone.isNotEmpty ? st.phone : 'Not Provided'),
-            _buildInfoRow('Email', st.email.isNotEmpty ? st.email : 'Not Provided'),
-            _buildInfoRow('Assigned Classes', st.assignedClasses.isNotEmpty ? st.assignedClasses.join(', ') : (st.assignedClass.isNotEmpty ? st.assignedClass : 'None')),
-            _buildInfoRow('UPI Cashier VPA', st.upiId.isNotEmpty ? st.upiId : 'None'),
-          ],
+      ),
+    );
+  }
+
+  Widget _buildIdCardRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 11, color: Colors.white70)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.white),
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
-        ],
+      ],
+    );
+  }
+
+  Widget _buildIdCardPerm(String label, bool active) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      decoration: BoxDecoration(
+        color: active ? const Color(0xFF059669).withOpacity(0.25) : Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: active ? const Color(0xFF34D399).withOpacity(0.5) : Colors.white10),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.bold,
+          color: active ? const Color(0xFF34D399) : Colors.white38,
+        ),
       ),
     );
   }
@@ -2589,14 +2656,14 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         title: Text('Login Credentials: ${st.name}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: emailCtrl, decoration: const InputDecoration(labelText: 'Login Email / Username', border: OutlineInputBorder())),
-            const SizedBox(height: 12),
-            TextField(controller: passCtrl, obscureText: true, decoration: const InputDecoration(labelText: 'Reset Portal Password', border: OutlineInputBorder(), hintText: 'Enter new password')),
+            TextField(controller: emailCtrl, decoration: const InputDecoration(labelText: 'Login Email / Username', border: OutlineInputBorder(), isDense: true)),
+            const SizedBox(height: 10),
+            TextField(controller: passCtrl, obscureText: true, decoration: const InputDecoration(labelText: 'New Password', border: OutlineInputBorder(), isDense: true)),
           ],
         ),
         actions: [
@@ -2902,7 +2969,6 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
       ),
     );
   }
-
 
   // ========================================================================
   // MODULE 2: STUDENT ADMINISTRATION & ENROLLMENT
