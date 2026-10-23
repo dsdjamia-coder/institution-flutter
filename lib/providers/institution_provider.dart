@@ -86,6 +86,10 @@ class InstitutionProvider extends ChangeNotifier {
       _students.where((s) => s.status.toLowerCase() == 'active' && s.gender.toLowerCase() == 'male').length;
   int get totalGirls =>
       _students.where((s) => s.status.toLowerCase() == 'active' && s.gender.toLowerCase() == 'female').length;
+  int get maleStudents => totalBoys;
+  int get femaleStudents => totalGirls;
+  int get alumniCount => alumniStudents.length;
+  List<Staff> get staff => _staffList;
   int get totalStaff => _staffList.length;
   int get activeStaffCount => _staffList.where((s) => s.isActive).length;
 

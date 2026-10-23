@@ -1325,7 +1325,7 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cannot delete the active working session!'), backgroundColor: Colors.red));
                       return;
                     }
-                    final ok = await _confirmAction('Delete Year', 'Are you sure you want to remove session ${y.label}?');
+                    final ok = await _confirmAction(context, title: 'Delete Year', message: 'Are you sure you want to remove session ${y.label}?');
                     if (ok) {
                       await provider.deleteAcademicYear(y.label);
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Academic Year "${y.label}" removed.')));
@@ -1565,7 +1565,7 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                                 const SizedBox(width: 4),
                                 InkWell(
                                   onTap: () async {
-                                    final ok = await _confirmAction('Delete Category', 'Delete "${cat.name}" category?');
+                                    final ok = await _confirmAction(context, title: 'Delete Category', message: 'Delete "${cat.name}" category?');
                                     if (ok) {
                                       await provider.deleteStaffCategory(cat.id);
                                       setState(() {});
@@ -2269,7 +2269,7 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                 bgColor: const Color(0xFFFEF2F2),
                 borderColor: const Color(0xFFFECACA),
                 onTap: () async {
-                  final ok = await _confirmAction('Delete Staff', 'Are you sure you want to delete staff member "${st.name}"?');
+                  final ok = await _confirmAction(context, title: 'Delete Staff', message: 'Are you sure you want to delete staff member "${st.name}"?');
                   if (ok) {
                     await provider.deleteStaff(st.id);
                     setState(() {});
