@@ -14,6 +14,7 @@ import '../../models/fee_concession.dart';
 import '../../models/custom_fee_item.dart';
 import '../../models/audit_log.dart';
 import '../../models/payment.dart';
+import '../../models/staff_category.dart';
 import '../../services/duplicate_guard.dart';
 import '../../widgets/stat_card.dart';
 import '../../widgets/layout/adaptive_portal_scaffold.dart';
@@ -39,6 +40,13 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
   // Staff Directory Filter & State
   final _staffSearchCtrl = TextEditingController();
   String _staffRoleFilter = 'ALL';
+  String _staffTypeFilter = 'all';
+  bool _showInactiveStaff = false;
+
+  // Staff Categories Form State
+  final _catNameCtrl = TextEditingController();
+  final _catOrderCtrl = TextEditingController(text: '1');
+  bool _catPublic = true;
 
   // Add Staff Form State
   final _addStaffNameCtrl = TextEditingController();
@@ -46,9 +54,13 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
   final _addStaffSamasthaCtrl = TextEditingController();
   final _addStaffPhoneCtrl = TextEditingController();
   final _addStaffEmailCtrl = TextEditingController();
+  final _addStaffPasswordCtrl = TextEditingController();
+  final _addStaffPhotoUrlCtrl = TextEditingController();
+  final _addStaffOrderCtrl = TextEditingController(text: '999');
   final _addStaffUpiAccCtrl = TextEditingController();
   final _addStaffUpiIdCtrl = TextEditingController();
   String _addStaffRole = 'TEACHER';
+  String _addStaffType = 'Teacher';
   bool _addStaffCanCollect = true;
   bool _addStaffCanWorksheet = true;
   bool _addStaffCanResults = true;
@@ -275,6 +287,11 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
     _addStaffEmailCtrl.dispose();
     _addStaffUpiAccCtrl.dispose();
     _addStaffUpiIdCtrl.dispose();
+    _addStaffPasswordCtrl.dispose();
+    _addStaffPhotoUrlCtrl.dispose();
+    _addStaffOrderCtrl.dispose();
+    _catNameCtrl.dispose();
+    _catOrderCtrl.dispose();
     _bulkCsvTextCtrl.dispose();
     _newClassCtrl.dispose();
     _divisionBaseCtrl.dispose();
@@ -354,36 +371,36 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
         _currentSubIndex = sIdx;
       }),
       tabs: [
-        // MODULE 1: INSTITUTION SETTINGS
+        // MODULE 1: INSTITUTION & ACADEMIC CONTROL
         PortalTabItem(
           id: 'institution',
-          label: 'Institution Settings',
+          label: 'Institution',
           icon: Icons.apartment_rounded,
           badge: '${provider.totalStaff} Staff',
           subItems: [
             PortalSubItem(
               id: 'inst_overview',
-              label: 'Overview & Profile',
+              label: 'Dashboard',
               icon: Icons.dashboard_rounded,
               body: _buildOverviewTab(provider, setting),
             ),
             PortalSubItem(
               id: 'inst_academic_years',
-              label: 'Academic Years',
+              label: 'Academic Year Control',
               icon: Icons.calendar_month_rounded,
               body: _buildAcademicYearsTab(provider, setting),
             ),
             PortalSubItem(
-              id: 'inst_staff',
-              label: 'Staff Directory',
-              icon: Icons.badge_rounded,
-              body: _buildStaffDirectoryTab(provider),
-            ),
-            PortalSubItem(
               id: 'inst_add_staff',
-              label: 'Add Staff & Categories',
+              label: 'Add Staff',
               icon: Icons.person_add_alt_1_rounded,
               body: _buildAddStaffTab(provider),
+            ),
+            PortalSubItem(
+              id: 'inst_staff',
+              label: 'Staff & Management',
+              icon: Icons.badge_rounded,
+              body: _buildStaffDirectoryTab(provider),
             ),
           ],
         ),
@@ -596,121 +613,1100 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
     return result ?? false;
   }
 
-  // ========================================================================
+// ========================================================================
   // MODULE 1: INSTITUTION & ACADEMIC CONTROL
   // ========================================================================
 
-  // 1A. OVERVIEW & PROFILE
+  // 1A. DASHBOARD (#dashboard / dashboard-page)
   Widget _buildOverviewTab(InstitutionProvider provider, dynamic setting) {
-    final hasActiveYear = setting.activeAcademicYear.isNotEmpty;
-    final hasClasses = provider.classes.isNotEmpty;
-    final hasStaff = provider.staffList.isNotEmpty;
-    final hasFeeConfig = setting.defaultMonthlyFee > 0;
-    final isConfigured = hasActiveYear && hasClasses && hasStaff && hasFeeConfig;
+    final activeYear = setting.activeAcademicYear.isNotEmpty ? setting.activeAcademicYear : '2024-2025';
+    final totalConfiguredYears = provider.academicYears.isNotEmpty ? provider.academicYears.length : 1;
+    final totalActiveStudents = provider.totalActiveStudents;
+    final totalClasses = provider.classes.length;
+    final activeStaffCount = provider.activeStaffCount > 0 ? provider.activeStaffCount : provider.totalStaff;
+    final totalFeeItems = provider.customFeeItems.length + 1;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isDesktop = constraints.maxWidth >= 900;
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top Institutional Badge Card
+              Container(
+                margin: const EdgeInsets.bottom: 16,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 8, offset: Offset(0, 2))],
+                ),
+                child: Row(
+                  children: [
+                    Image.asset('assets/icon.png', width: 28, height: 28, errorBuilder: (_, __, ___) => const Icon(Icons.school, size: 28, color: Color(0xFF2563EB))),
+                    const SizedBox(width: 12),
+                    Text(
+                      setting.institutionName.toUpperCase(),
+                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, letterSpacing: 0.5, color: Color(0xFF0F172A)),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Header: Institution Command Center
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 10, offset: Offset(0, 4))],
+                ),
+                child: isDesktop
+                    ? Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: const [
+                                Text(
+                                  'ADMIN OVERVIEW',
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 2.5, color: Color(0xFF2563EB)),
+                                ),
+                                SizedBox(height: 6),
+                                Text(
+                                  'Institution Command Center',
+                                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                                ),
+                                SizedBox(height: 6),
+                                Text(
+                                  'Monitor the active academic year, core records, and jump directly into day-to-day administration.',
+                                  style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 20),
+                          _buildActiveYearBadgeBox(activeYear, totalConfiguredYears),
+                        ],
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'ADMIN OVERVIEW',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 2.5, color: Color(0xFF2563EB)),
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Institution Command Center',
+                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Monitor the active academic year, core records, and jump directly into day-to-day administration.',
+                            style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
+                          ),
+                          const SizedBox(height: 16),
+                          _buildActiveYearBadgeBox(activeYear, totalConfiguredYears),
+                        ],
+                      ),
+              ),
+              const SizedBox(height: 16),
+
+              // 4 Stat Cards
+              LayoutBuilder(
+                builder: (ctx, statConstraints) {
+                  final cols = statConstraints.maxWidth >= 900 ? 4 : (statConstraints.maxWidth >= 550 ? 2 : 1);
+                  return GridView.count(
+                    crossAxisCount: cols,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisSpacing: 14,
+                    mainAxisSpacing: 14,
+                    childAspectRatio: cols == 4 ? 1.7 : 2.2,
+                    children: [
+                      // Students
+                      _buildDashCard(
+                        label: 'STUDENTS',
+                        value: '$totalActiveStudents',
+                        subtext: 'Records in active year',
+                        bgColor: const Color(0xFFEFF6FF),
+                        borderColor: const Color(0xFFDBEAFE),
+                        labelColor: const Color(0xFF2563EB),
+                        valueColor: const Color(0xFF1E3A8A),
+                        subtextColor: const Color(0xFF1D4ED8),
+                      ),
+                      // Classes
+                      _buildDashCard(
+                        label: 'CLASSES',
+                        value: '$totalClasses',
+                        subtext: 'Active classes / divisions',
+                        bgColor: const Color(0xFFEEF2FF),
+                        borderColor: const Color(0xFFE0E7FF),
+                        labelColor: const Color(0xFF4F46E5),
+                        valueColor: const Color(0xFF312E81),
+                        subtextColor: const Color(0xFF4338CA),
+                      ),
+                      // Staff
+                      _buildDashCard(
+                        label: 'STAFF',
+                        value: '$activeStaffCount',
+                        subtext: 'Active staff accounts',
+                        bgColor: const Color(0xFFECFDF5),
+                        borderColor: const Color(0xFFD1FAE5),
+                        labelColor: const Color(0xFF059669),
+                        valueColor: const Color(0xFF064E3B),
+                        subtextColor: const Color(0xFF047857),
+                      ),
+                      // Fee Items
+                      _buildDashCard(
+                        label: 'FEE ITEMS',
+                        value: '$totalFeeItems',
+                        subtext: 'Configured collection items',
+                        bgColor: const Color(0xFFFFFBEB),
+                        borderColor: const Color(0xFFFEF3C7),
+                        labelColor: const Color(0xFFD97706),
+                        valueColor: const Color(0xFF78350F),
+                        subtextColor: const Color(0xFFB45309),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 20),
+
+              // Lower Section: Quick Actions & Operational Snapshot
+              isDesktop
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(flex: 2, child: _buildQuickActionsCard()),
+                        const SizedBox(width: 16),
+                        Expanded(flex: 1, child: _buildOperationalSnapshotCard(provider)),
+                      ],
+                    )
+                  : Column(
+                      children: [
+                        _buildQuickActionsCard(),
+                        const SizedBox(height: 16),
+                        _buildOperationalSnapshotCard(provider),
+                      ],
+                    ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildActiveYearBadgeBox(String activeYear, int totalYears) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFDBEAFE)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'ACTIVE ACADEMIC YEAR',
+            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Color(0xFF3B82F6)),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            activeYear,
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF1E3A8A)),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            '$totalYears academic year record(s) configured',
+            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF1D4ED8)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDashCard({
+    required String label,
+    required String value,
+    required String subtext,
+    required Color bgColor,
+    required Color borderColor,
+    required Color labelColor,
+    required Color valueColor,
+    required Color subtextColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            label,
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2, color: labelColor),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: valueColor),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtext,
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: subtextColor),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickActionsCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 10, offset: Offset(0, 4))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: const [
+              Text('Quick Actions', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+              Text('STAGE 3', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5, color: Color(0xFF94A3B8))),
+            ],
+          ),
+          const Divider(height: 24),
+          LayoutBuilder(
+            builder: (ctx, constraints) {
+              final isTwoCol = constraints.maxWidth >= 450;
+              return GridView.count(
+                crossAxisCount: isTwoCol ? 2 : 1,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: isTwoCol ? 2.8 : 3.5,
+                children: [
+                  _buildQuickActionTile(
+                    icon: Icons.calendar_month_rounded,
+                    iconColor: const Color(0xFF2563EB),
+                    label: 'Manage Academic Years',
+                    onTap: () => setState(() {
+                      _currentModuleIndex = 0;
+                      _currentSubIndex = 1;
+                    }),
+                  ),
+                  _buildQuickActionTile(
+                    icon: Icons.person_add_rounded,
+                    iconColor: const Color(0xFF059669),
+                    label: 'Add Students',
+                    onTap: () => setState(() {
+                      _currentModuleIndex = 1;
+                      _currentSubIndex = 1;
+                    }),
+                  ),
+                  _buildQuickActionTile(
+                    icon: Icons.alt_route_rounded,
+                    iconColor: const Color(0xFF4F46E5),
+                    label: 'Classes & Divisions',
+                    onTap: () => setState(() {
+                      _currentModuleIndex = 1;
+                      _currentSubIndex = 3;
+                    }),
+                  ),
+                  _buildQuickActionTile(
+                    icon: Icons.payments_rounded,
+                    iconColor: const Color(0xFFD97706),
+                    label: 'Configure Fees',
+                    onTap: () => setState(() {
+                      _currentModuleIndex = 3;
+                      _currentSubIndex = 1;
+                    }),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickActionTile({
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: iconColor),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xFF1E293B)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOperationalSnapshotCard(InstitutionProvider provider) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 10, offset: Offset(0, 4))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Operational Snapshot', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+          const Divider(height: 24),
+          _buildSnapshotRow('Student Groups', '${provider.studentGroups.length}'),
+          const Divider(height: 20),
+          _buildSnapshotRow('Girls', '${provider.totalGirls}'),
+          const Divider(height: 20),
+          _buildSnapshotRow('Boys', '${provider.totalBoys}'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSnapshotRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
+        Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+      ],
+    );
+  }
+
+  // ========================================================================
+  // 1B. ACADEMIC YEAR CONTROL (#academic-years / academic-years-page)
+  // ========================================================================
+  Widget _buildAcademicYearsTab(InstitutionProvider provider, dynamic setting) {
+    final activeYear = setting.activeAcademicYear.isNotEmpty ? setting.activeAcademicYear : '2024-2025';
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isDesktop = constraints.maxWidth >= 900;
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top Form Card
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 10, offset: Offset(0, 4))],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Top Row with Title & Current Working Year Box
+                    isDesktop
+                        ? Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Academic Year Control', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                                    SizedBox(height: 4),
+                                    Text('Create academic years, set the active working year, and use it as the foundation for student and class management.', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B))),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 20),
+                              _buildCurrentWorkingYearBadge(activeYear),
+                            ],
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Academic Year Control', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                              const SizedBox(height: 4),
+                              const Text('Create academic years, set the active working year, and use it as the foundation for student and class management.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                              const SizedBox(height: 14),
+                              _buildCurrentWorkingYearBadge(activeYear),
+                            ],
+                          ),
+                    const Divider(height: 28),
+
+                    // 5-Column Inline Form
+                    isDesktop
+                        ? Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // 1. Year input
+                              Expanded(
+                                flex: 2,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('Academic Year', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                                    const SizedBox(height: 6),
+                                    TextField(
+                                      controller: _yearLabelCtrl,
+                                      style: const TextStyle(fontFamily: 'monospace', fontSize: 13, fontWeight: FontWeight.bold),
+                                      decoration: const InputDecoration(
+                                        hintText: 'e.g. 2025-2026',
+                                        border: OutlineInputBorder(),
+                                        isDense: true,
+                                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    const Text('Format: YYYY-YYYY (e.g. 2025-2026)', style: TextStyle(fontSize: 11, color: Color(0xFF059669), fontWeight: FontWeight.w600)),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              // 2. Start Month
+                              Expanded(
+                                flex: 2,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('Start Month', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                                    const SizedBox(height: 6),
+                                    DropdownButtonFormField<String>(
+                                      value: months.contains(_yearStartMonth) ? _yearStartMonth : 'June',
+                                      decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12)),
+                                      items: months.map((m) => DropdownMenuItem(value: m, child: Text(m, style: const TextStyle(fontSize: 13)))).toList(),
+                                      onChanged: (v) => setState(() => _yearStartMonth = v ?? 'June'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              // 3. End Month
+                              Expanded(
+                                flex: 2,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('End Month', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                                    const SizedBox(height: 6),
+                                    DropdownButtonFormField<String>(
+                                      value: months.contains(_yearEndMonth) ? _yearEndMonth : 'May',
+                                      decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12)),
+                                      items: months.map((m) => DropdownMenuItem(value: m, child: Text(m, style: const TextStyle(fontSize: 13)))).toList(),
+                                      onChanged: (v) => setState(() => _yearEndMonth = v ?? 'May'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              // 4. Status
+                              Expanded(
+                                flex: 2,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('Status', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                                    const SizedBox(height: 6),
+                                    DropdownButtonFormField<String>(
+                                      value: _yearStatus,
+                                      decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12)),
+                                      items: const [
+                                        DropdownMenuItem(value: 'active', child: Text('Active', style: TextStyle(fontSize: 13))),
+                                        DropdownMenuItem(value: 'current', child: Text('Current Academic Year', style: TextStyle(fontSize: 13))),
+                                        DropdownMenuItem(value: 'archived', child: Text('Archive', style: TextStyle(fontSize: 13))),
+                                      ],
+                                      onChanged: (v) => setState(() => _yearStatus = v ?? 'active'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              // 5. Button
+                              Expanded(
+                                flex: 2,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const SizedBox(height: 22),
+                                    ElevatedButton.icon(
+                                      onPressed: () => _handleApplyYearSettings(provider),
+                                      icon: const Icon(Icons.save_rounded, size: 16),
+                                      label: const Text('Apply Year Settings', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF2563EB),
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              TextField(
+                                controller: _yearLabelCtrl,
+                                style: const TextStyle(fontFamily: 'monospace', fontSize: 13, fontWeight: FontWeight.bold),
+                                decoration: const InputDecoration(labelText: 'Academic Year *', hintText: 'e.g. 2025-2026', border: OutlineInputBorder(), helperText: 'Format: YYYY-YYYY (e.g. 2025-2026)'),
+                              ),
+                              const SizedBox(height: 12),
+                              DropdownButtonFormField<String>(
+                                value: months.contains(_yearStartMonth) ? _yearStartMonth : 'June',
+                                decoration: const InputDecoration(labelText: 'Start Month', border: OutlineInputBorder()),
+                                items: months.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                                onChanged: (v) => setState(() => _yearStartMonth = v ?? 'June'),
+                              ),
+                              const SizedBox(height: 12),
+                              DropdownButtonFormField<String>(
+                                value: months.contains(_yearEndMonth) ? _yearEndMonth : 'May',
+                                decoration: const InputDecoration(labelText: 'End Month', border: OutlineInputBorder()),
+                                items: months.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                                onChanged: (v) => setState(() => _yearEndMonth = v ?? 'May'),
+                              ),
+                              const SizedBox(height: 12),
+                              DropdownButtonFormField<String>(
+                                value: _yearStatus,
+                                decoration: const InputDecoration(labelText: 'Status', border: OutlineInputBorder()),
+                                items: const [
+                                  DropdownMenuItem(value: 'active', child: Text('Active')),
+                                  DropdownMenuItem(value: 'current', child: Text('Current Academic Year')),
+                                  DropdownMenuItem(value: 'archived', child: Text('Archive')),
+                                ],
+                                onChanged: (v) => setState(() => _yearStatus = v ?? 'active'),
+                              ),
+                              const SizedBox(height: 16),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  onPressed: () => _handleApplyYearSettings(provider),
+                                  icon: const Icon(Icons.save_rounded, size: 16),
+                                  label: const Text('Apply Year Settings', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF2563EB),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Section: Configured Academic Years
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 10, offset: Offset(0, 4))],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: const [
+                        Text('Configured Academic Years', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                        Text('YEAR-FIRST WORKFLOW', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5, color: Color(0xFF94A3B8))),
+                      ],
+                    ),
+                    const Divider(height: 24),
+                    if (provider.academicYears.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(40),
+                        alignment: Alignment.center,
+                        child: const Text('No academic years configured yet.', style: TextStyle(color: Color(0xFF64748B), fontStyle: FontStyle.italic)),
+                      )
+                    else
+                      LayoutBuilder(
+                        builder: (ctx, gridConstraints) {
+                          final cols = gridConstraints.maxWidth >= 960 ? 3 : (gridConstraints.maxWidth >= 600 ? 2 : 1);
+                          return GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: provider.academicYears.length,
+                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: cols,
+                              crossAxisSpacing: 14,
+                              mainAxisSpacing: 14,
+                              childAspectRatio: 1.35,
+                            ),
+                            itemBuilder: (ctx, idx) {
+                              final y = provider.academicYears[idx];
+                              return _buildAcademicYearCard(y, provider, setting);
+                            },
+                          );
+                        },
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCurrentWorkingYearBadge(String activeYear) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFECFDF5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFA7F3D0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'CURRENT WORKING YEAR',
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Color(0xFF059669)),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            activeYear,
+            style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: Color(0xFF064E3B)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAcademicYearCard(AcademicYearConfig y, InstitutionProvider provider, dynamic setting) {
+    final isCurrent = y.label == setting.activeAcademicYear || y.status == 'current';
+    final isArchived = !isCurrent && y.status == 'archived';
+
+    final yearStudentsCount = provider.students.where((s) {
+      if (s.academicYear == y.label) return true;
+      if (s.academicYear.isEmpty && isCurrent) return true;
+      return false;
+    }).length;
+
+    final yearClassesCount = provider.classes.length;
+    final yearStaffCount = provider.activeStaffCount > 0 ? provider.activeStaffCount : provider.totalStaff;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: isCurrent ? const Color(0xFF6EE7B7) : const Color(0xFFE2E8F0)),
+        boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 8, offset: Offset(0, 2))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Row 1: Year Label & 3-dot popup menu
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.calendar_month_rounded, size: 20, color: Color(0xFF2563EB)),
+                  const SizedBox(width: 8),
+                  Text(
+                    y.label,
+                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                  ),
+                ],
+              ),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert, size: 20, color: Color(0xFF64748B)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                onSelected: (val) async {
+                  if (val == 'edit') {
+                    _showEditAcademicYearModal(y, provider);
+                  } else if (val == 'delete') {
+                    final confirmed = await _confirmAction(
+                      context,
+                      title: 'Delete Academic Year',
+                      message: 'Are you sure you want to delete academic year "${y.label}"? Enrolled student records may be affected.',
+                      confirmLabel: 'Delete Year',
+                    );
+                    if (confirmed) {
+                      await provider.deleteAcademicYear(y.label);
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Academic Year "${y.label}" deleted.')));
+                    }
+                  }
+                },
+                itemBuilder: (ctx) => [
+                  const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined, size: 16, color: Color(0xFF2563EB)), SizedBox(width: 8), Text('Edit months', style: TextStyle(fontSize: 12.5))])),
+                  const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 16, color: Colors.red), SizedBox(width: 8), Text('Delete year', style: TextStyle(fontSize: 12.5, color: Colors.red))])),
+                ],
+              ),
+            ],
+          ),
+
+          // Row 2: Status Badge & Status Dropdown Select
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Badge
+              if (isCurrent)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFA7F3D0))),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF059669)),
+                      SizedBox(width: 4),
+                      Text('Current Academic Year', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF065F46))),
+                    ],
+                  ),
+                )
+              else if (isArchived)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(color: const Color(0xFFFFFBEB), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFFDE68A))),
+                  child: const Text('Archive', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF92400E))),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFBFDBFE))),
+                  child: const Text('Active', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1E40AF))),
+                ),
+
+              // Status Dropdown
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: DropdownButton<String>(
+                  value: isCurrent ? 'current' : (isArchived ? 'archived' : 'active'),
+                  underline: const SizedBox(),
+                  isDense: true,
+                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
+                  items: const [
+                    DropdownMenuItem(value: 'active', child: Text('Active')),
+                    DropdownMenuItem(value: 'current', child: Text('Current Academic Year')),
+                    DropdownMenuItem(value: 'archived', child: Text('Archive')),
+                  ],
+                  onChanged: (newStatus) async {
+                    if (newStatus == null) return;
+                    if (newStatus == 'current') {
+                      await provider.setWorkingAcademicYear(y.label);
+                    } else {
+                      final updated = AcademicYearConfig(label: y.label, startMonth: y.startMonth, endMonth: y.endMonth, status: newStatus);
+                      await provider.addAcademicYear(updated);
+                    }
+                    setState(() {});
+                  },
+                ),
+              ),
+            ],
+          ),
+
+          // Row 3: Months label
+          Row(
+            children: [
+              const Icon(Icons.schedule_rounded, size: 14, color: Color(0xFF64748B)),
+              const SizedBox(width: 6),
+              Text(
+                'Months: ${y.startMonth} \u2192 ${y.endMonth}',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF64748B)),
+              ),
+            ],
+          ),
+
+          // Row 4: 3 Mini Stat Boxes
+          Row(
+            children: [
+              Expanded(
+                child: _buildMiniStatBox('STUDENTS', '$yearStudentsCount', const Color(0xFFEFF6FF), const Color(0xFFBFDBFE), const Color(0xFF1D4ED8)),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildMiniStatBox('CLASSES', '$yearClassesCount', const Color(0xFFEEF2FF), const Color(0xFFC7D2FE), const Color(0xFF4338CA)),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildMiniStatBox('STAFF', '$yearStaffCount', const Color(0xFFECFDF5), const Color(0xFFA7F3D0), const Color(0xFF047857)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniStatBox(String label, String value, Color bg, Color border, Color text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8), border: Border.all(color: border)),
+      child: Column(
+        children: [
+          Text(label, style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: text)),
+          const SizedBox(height: 2),
+          Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: text)),
+        ],
+      ),
+    );
+  }
+
+  void _handleApplyYearSettings(InstitutionProvider provider) async {
+    final label = _yearLabelCtrl.text.trim();
+    if (!RegExp(r'^\d{4}-\d{4}$').hasMatch(label)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid Format! Please use format YYYY-YYYY (e.g. 2025-2026).'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    final config = AcademicYearConfig(
+      label: label,
+      startMonth: _yearStartMonth,
+      endMonth: _yearEndMonth,
+      status: _yearStatus,
+    );
+
+    await provider.addAcademicYear(config);
+    if (_yearStatus == 'current') {
+      await provider.setWorkingAcademicYear(label);
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Academic Year "$label" saved successfully!'), backgroundColor: const Color(0xFF059669)),
+    );
+    setState(() {});
+  }
+
+  // ========================================================================
+  // 1C. ADD STAFF (#add-staff / add-staff-page)
+  // ========================================================================
+  Widget _buildAddStaffTab(InstitutionProvider provider) {
+    final categories = provider.staffCategories;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Command Center Banner
+          // Section 1: Staff Categories Banner
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              color: const Color(0xFFECFDF5).withOpacity(0.5),
               borderRadius: BorderRadius.circular(16),
-              boxShadow: AppColors.cardShadow,
-              border: Border.all(color: Colors.white10),
+              border: Border.all(color: const Color(0xFFA7F3D0)),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF2563EB).withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: const Color(0xFF2563EB).withOpacity(0.4)),
-                            ),
-                            child: const Text(
-                              'INSTITUTION COMMAND CENTER',
-                              style: TextStyle(color: Color(0xFF93C5FD), fontSize: 10.5, fontWeight: FontWeight.bold, letterSpacing: 0.8),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            width: 6,
-                            height: 6,
-                            decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle),
-                          ),
-                          const SizedBox(width: 4),
-                          const Text('LIVE CLOUD CONNECTED', style: TextStyle(color: Color(0xFF6EE7B7), fontSize: 10, fontWeight: FontWeight.w600)),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        setting.institutionName,
-                        style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.bold, letterSpacing: -0.3),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${setting.place} • Reg #${setting.regNo} • ${setting.managementName}',
-                        style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-                InkWell(
-                  onTap: () => setState(() {
-                    _currentModuleIndex = 0;
-                    _currentSubIndex = 1;
-                  }),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white12),
-                    ),
-                    child: Column(
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: const [
+                    Row(
                       children: [
-                        const Text('ACTIVE ACADEMIC YEAR', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                        const SizedBox(height: 3),
-                        Row(
-                          children: [
-                            Text(setting.activeAcademicYear, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
-                            const SizedBox(width: 6),
-                            const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Colors.white60),
-                          ],
-                        ),
+                        Icon(Icons.layers_rounded, color: Color(0xFF047857), size: 18),
+                        SizedBox(width: 8),
+                        Text('Staff Categories', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF065F46))),
                       ],
                     ),
-                  ),
+                    Text('Add categories here or click edit to customize fields', style: TextStyle(fontSize: 11, color: Color(0xFF047857))),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Inline Category Add Form
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 220,
+                      child: TextField(
+                        controller: _catNameCtrl,
+                        decoration: const InputDecoration(
+                          hintText: 'Category Name (e.g. Drivers)',
+                          fillColor: Colors.white,
+                          filled: true,
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      width: 80,
+                      child: TextField(
+                        controller: _catOrderCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          hintText: 'Order',
+                          fillColor: Colors.white,
+                          filled: true,
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFCBD5E1))),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Checkbox(
+                            value: _catPublic,
+                            activeColor: const Color(0xFF059669),
+                            onChanged: (v) => setState(() => _catPublic = v ?? true),
+                          ),
+                          const Text('Public', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+                        ],
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () async {
+                        final catName = _catNameCtrl.text.trim();
+                        if (catName.isEmpty) return;
+                        final order = int.tryParse(_catOrderCtrl.text.trim()) ?? (categories.length + 1);
+                        final newCat = StaffCategory(id: catName, name: catName, order: order, showPublic: _catPublic, isCore: false);
+                        await provider.saveStaffCategory(newCat);
+                        _catNameCtrl.clear();
+                        _catOrderCtrl.text = '${categories.length + 2}';
+                        setState(() {});
+                      },
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('Add', style: TextStyle(fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Divider(color: Color(0xFFD1FAE5)),
+
+                // Category Pills List
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: categories.map((cat) {
+                    final isCore = cat.isCore;
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: isCore ? const Color(0xFFBFDBFE) : const Color(0xFFA7F3D0)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(cat.name, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isCore ? const Color(0xFF1E3A8A) : const Color(0xFF064E3B))),
+                          const SizedBox(width: 6),
+                          if (isCore)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(4)),
+                              child: const Text('DEFAULT', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF1D4ED8))),
+                            ),
+                          const SizedBox(width: 4),
+                          Text('#${cat.order}', style: const TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF94A3B8))),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(color: cat.showPublic ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(4)),
+                            child: Text(cat.showPublic ? 'Public' : 'Hidden', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: cat.showPublic ? const Color(0xFF047857) : const Color(0xFF64748B))),
+                          ),
+                          const SizedBox(width: 6),
+                          InkWell(
+                            onTap: () => _showEditStaffCategoryModal(cat, provider),
+                            child: const Icon(Icons.edit_outlined, size: 14, color: Color(0xFF2563EB)),
+                          ),
+                          if (!isCore) ...[
+                            const SizedBox(width: 4),
+                            InkWell(
+                              onTap: () async {
+                                final confirmed = await _confirmAction(context, title: 'Delete Category', message: 'Delete staff category "${cat.name}"?', confirmLabel: 'Delete');
+                                if (confirmed) {
+                                  await provider.deleteStaffCategory(cat.id);
+                                  setState(() {});
+                                }
+                              },
+                              child: const Icon(Icons.delete_outline, size: 14, color: Colors.red),
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+                  }).toList(),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
 
-          // Institutional Readiness Status Card
+          // Section 2: Add New Staff Form Card
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(16),
               border: Border.all(color: const Color(0xFFE2E8F0)),
-              boxShadow: AppColors.cardShadow,
+              boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 10, offset: Offset(0, 4))],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -718,143 +1714,233 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
+                    const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(
-                          isConfigured ? Icons.verified_rounded : Icons.pending_actions_rounded,
-                          color: isConfigured ? const Color(0xFF059669) : const Color(0xFFD97706),
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        const Text('Institutional Setup & Health Checklist', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                        Text('Add New Staff', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                        SizedBox(height: 4),
+                        Text('Select a category below to automatically load its configured input fields.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                       ],
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: isConfigured ? const Color(0xFFECFDF5) : const Color(0xFFFFFBEB),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: isConfigured ? const Color(0xFFA7F3D0) : const Color(0xFFFDE68A)),
-                      ),
-                      child: Text(
-                        isConfigured ? 'System Fully Configured' : 'Setup Incomplete',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.bold,
-                          color: isConfigured ? const Color(0xFF065F46) : const Color(0xFF92400E),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFA7F3D0))),
+                      child: Text('Category: $_addStaffType', style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF047857))),
+                    ),
+                  ],
+                ),
+                const Divider(height: 24),
+
+                // 1. Category / Type Selector Sub-card
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: DropdownButtonFormField<String>(
+                          value: categories.any((c) => c.name == _addStaffType) ? _addStaffType : (categories.isNotEmpty ? categories.first.name : 'Teacher'),
+                          decoration: const InputDecoration(labelText: '1. Select Staff Category (Type) *', border: OutlineInputBorder(), isDense: true, fillColor: Colors.white, filled: true),
+                          items: categories.map((c) => DropdownMenuItem(value: c.name, child: Text(c.name, style: const TextStyle(fontWeight: FontWeight.bold)))).toList(),
+                          onChanged: (v) => setState(() => _addStaffType = v ?? 'Teacher'),
                         ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        flex: 1,
+                        child: TextField(
+                          controller: _addStaffOrderCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(labelText: 'Display Order (Public)', border: OutlineInputBorder(), isDense: true, fillColor: Colors.white, filled: true),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Staff Photo Row
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
+                  child: Row(
+                    children: [
+                      const CircleAvatar(
+                        radius: 26,
+                        backgroundColor: Color(0xFFE2E8F0),
+                        child: Icon(Icons.person, size: 28, color: Color(0xFF94A3B8)),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Text('Staff Photo (Upload & Mobile Camera) (Max 50KB)', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                            SizedBox(height: 2),
+                            Text('Supported formats: JPG, PNG, WEBP', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                          ],
+                        ),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => setState(() => _addStaffPhotoUrlCtrl.text = 'camera_photo.jpg'),
+                        icon: const Icon(Icons.camera_alt_outlined, size: 15),
+                        label: const Text('Camera', style: TextStyle(fontSize: 12)),
+                      ),
+                      const SizedBox(width: 8),
+                      OutlinedButton.icon(
+                        onPressed: () => setState(() => _addStaffPhotoUrlCtrl.text = 'assets/images/logo.png'),
+                        icon: const Icon(Icons.upload_file_outlined, size: 15),
+                        label: const Text('Upload', style: TextStyle(fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Form Fields
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _addStaffNameCtrl,
+                        decoration: const InputDecoration(labelText: '2. Full Name *', border: OutlineInputBorder()),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: _addStaffDesigCtrl,
+                        decoration: const InputDecoration(labelText: '3. Role / Designation / Subject *', border: OutlineInputBorder()),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _addStaffPhoneCtrl,
+                        keyboardType: TextInputType.phone,
+                        decoration: const InputDecoration(labelText: '4. Phone Number', border: OutlineInputBorder()),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: _addStaffEmailCtrl,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: const InputDecoration(labelText: '5. Login Email (For Portal Login)', border: OutlineInputBorder()),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                TextField(
+                  controller: _addStaffPasswordCtrl,
+                  obscureText: true,
+                  decoration: const InputDecoration(labelText: '6. Password (For Portal Login)', border: OutlineInputBorder(), hintText: 'Set portal login password'),
+                ),
+                const SizedBox(height: 16),
+
+                // Duty Classes Multi-select
+                const Text('Assigned Duty Classes', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: provider.classes.map((c) {
+                    final isSel = _addStaffAssignedClasses.contains(c);
+                    return FilterChip(
+                      selected: isSel,
+                      label: Text(c, style: TextStyle(fontSize: 12, fontWeight: isSel ? FontWeight.bold : FontWeight.normal)),
+                      onSelected: (val) {
+                        setState(() {
+                          if (val) _addStaffAssignedClasses.add(c); else _addStaffAssignedClasses.remove(c);
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
+
+                // 4-Portal Access Permissions
+                const Text('Portal Access Permissions', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                const SizedBox(height: 8),
                 Wrap(
                   spacing: 12,
                   runSpacing: 8,
                   children: [
-                    _buildSetupPill('Active Session', hasActiveYear, setting.activeAcademicYear),
-                    _buildSetupPill('Classes & Cohorts', hasClasses, '${provider.classes.length} Classes'),
-                    _buildSetupPill('Faculty & Accounts', hasStaff, '${provider.staffList.length} Accounts'),
-                    _buildSetupPill('Standard Fee Plan', hasFeeConfig, '₹${setting.defaultMonthlyFee.toStringAsFixed(0)} / mo'),
+                    _buildSwitchPill('Collection Portal', _addStaffCanCollect, (v) => setState(() => _addStaffCanCollect = v)),
+                    _buildSwitchPill('Worksheet Portal', _addStaffCanWorksheet, (v) => setState(() => _addStaffCanWorksheet = v)),
+                    _buildSwitchPill('Result Portal', _addStaffCanResults, (v) => setState(() => _addStaffCanResults = v)),
+                    _buildSwitchPill('Admin Access', _addStaffCanAdmin, (v) => setState(() => _addStaffCanAdmin = v)),
                   ],
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
+                const SizedBox(height: 24),
 
-          // Live Metrics Grid (6 KPI cards)
-          LayoutBuilder(
-            builder: (ctx, constraints) {
-              final isWide = constraints.maxWidth >= 720;
-              return GridView.count(
-                crossAxisCount: isWide ? 3 : 2,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: isWide ? 1.5 : 1.25,
-                children: [
-                  StatCard(
-                    title: 'Active Students',
-                    value: '${provider.totalActiveStudents}',
-                    subtitle: '${provider.totalBoys} Boys • ${provider.totalGirls} Girls',
-                    icon: Icons.school_rounded,
-                    color: const Color(0xFF2563EB),
-                  ),
-                  StatCard(
-                    title: 'Classes & Divisions',
-                    value: '${provider.classes.length}',
-                    subtitle: 'Active standard cohorts',
-                    icon: Icons.class_rounded,
-                    color: const Color(0xFF7C3AED),
-                  ),
-                  StatCard(
-                    title: 'Faculty & Staff',
-                    value: '${provider.totalStaff}',
-                    subtitle: 'Authenticated roles',
-                    icon: Icons.badge_rounded,
-                    color: const Color(0xFF059669),
-                  ),
-                  StatCard(
-                    title: 'Sibling Groups',
-                    value: '${provider.studentGroups.length}',
-                    subtitle: 'Family fee discount bundles',
-                    icon: Icons.diversity_3_rounded,
-                    color: const Color(0xFF0284C7),
-                  ),
-                  StatCard(
-                    title: 'Custom Fee Heads',
-                    value: '${provider.customFeeItems.length}',
-                    subtitle: 'Catalog items configured',
-                    icon: Icons.receipt_long_rounded,
-                    color: const Color(0xFFD97706),
-                  ),
-                  StatCard(
-                    title: 'Departed Archives',
-                    value: '${provider.discontinuedStudents.length}',
-                    subtitle: 'Preserved dues & records',
-                    icon: Icons.transfer_within_a_station_rounded,
-                    color: const Color(0xFFE11D48),
-                  ),
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 20),
+                // Submit Button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      final name = _addStaffNameCtrl.text.trim();
+                      if (name.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter Staff Full Name!'), backgroundColor: Colors.red));
+                        return;
+                      }
 
-          // Quick Administrative Launchers
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-              boxShadow: AppColors.cardShadow,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Administrative Action Launchers', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                const SizedBox(height: 4),
-                const Text('Direct shortcuts to administrative workflows across modules', style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
-                const SizedBox(height: 14),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    _buildQuickActionBtn('Academic Years', Icons.calendar_month_rounded, const Color(0xFF2563EB), () => setState(() { _currentModuleIndex = 0; _currentSubIndex = 1; })),
-                    _buildQuickActionBtn('Staff Directory', Icons.badge_rounded, const Color(0xFF059669), () => setState(() { _currentModuleIndex = 0; _currentSubIndex = 2; })),
-                    _buildQuickActionBtn('Add Staff Member', Icons.person_add_alt_1_rounded, const Color(0xFF0D9488), () => setState(() { _currentModuleIndex = 0; _currentSubIndex = 3; })),
-                    _buildQuickActionBtn('Manage Students', Icons.people_outline_rounded, const Color(0xFF7C3AED), () => setState(() { _currentModuleIndex = 1; _currentSubIndex = 0; })),
-                    _buildQuickActionBtn('Add Student (Manual)', Icons.person_add_rounded, const Color(0xFF2563EB), () => setState(() { _currentModuleIndex = 1; _currentSubIndex = 1; })),
-                    _buildQuickActionBtn('Bulk Excel Upload', Icons.file_upload_rounded, const Color(0xFFD97706), () => setState(() { _currentModuleIndex = 1; _currentSubIndex = 2; })),
-                    _buildQuickActionBtn('Classes & Divisions', Icons.alt_route_rounded, const Color(0xFF4F46E5), () => setState(() { _currentModuleIndex = 1; _currentSubIndex = 3; })),
-                    _buildQuickActionBtn('Discontinue / Exit', Icons.transfer_within_a_station_rounded, const Color(0xFFE11D48), () => setState(() { _currentModuleIndex = 2; _currentSubIndex = 0; })),
-                    _buildQuickActionBtn('Fee Windows & Rules', Icons.receipt_rounded, const Color(0xFFD97706), () => setState(() { _currentModuleIndex = 3; _currentSubIndex = 0; })),
-                    _buildQuickActionBtn('Publish Notice', Icons.campaign_rounded, const Color(0xFF059669), () => setState(() { _currentModuleIndex = 4; _currentSubIndex = 1; })),
-                    _buildQuickActionBtn('Export Backup JSON', Icons.download_rounded, const Color(0xFF475569), () => setState(() { _currentModuleIndex = 5; _currentSubIndex = 2; })),
-                  ],
+                      final staff = Staff(
+                        id: 'st_${DateTime.now().millisecondsSinceEpoch}',
+                        name: name,
+                        role: _addStaffType.toUpperCase() == 'MANAGEMENT' ? 'ADMIN' : 'TEACHER',
+                        designation: _addStaffDesigCtrl.text.trim().isNotEmpty ? _addStaffDesigCtrl.text.trim() : _addStaffType,
+                        type: _addStaffType,
+                        displayOrder: int.tryParse(_addStaffOrderCtrl.text.trim()) ?? 999,
+                        isActive: true,
+                        phone: _addStaffPhoneCtrl.text.trim(),
+                        email: _addStaffEmailCtrl.text.trim(),
+                        assignedClass: _addStaffAssignedClasses.join(', '),
+                        assignedClasses: _addStaffAssignedClasses.toList(),
+                        upiAccountName: _addStaffUpiAccCtrl.text.trim(),
+                        upiId: _addStaffUpiIdCtrl.text.trim(),
+                        hasCollectionAccess: _addStaffCanCollect,
+                        hasWorksheetAccess: _addStaffCanWorksheet,
+                        hasResultAccess: _addStaffCanResults,
+                        hasAdminAccess: _addStaffCanAdmin,
+                      );
+
+                      await provider.addStaff(staff);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Staff member "${staff.name}" registered successfully!'), backgroundColor: const Color(0xFF059669)),
+                      );
+
+                      // Clear form
+                      _addStaffNameCtrl.clear();
+                      _addStaffDesigCtrl.clear();
+                      _addStaffPhoneCtrl.clear();
+                      _addStaffEmailCtrl.clear();
+                      _addStaffPasswordCtrl.clear();
+                      _addStaffAssignedClasses.clear();
+
+                      // Jump to Tab 4 (Staff & Management)
+                      setState(() {
+                        _currentModuleIndex = 0;
+                        _currentSubIndex = 3;
+                      });
+                    },
+                    icon: const Icon(Icons.check, size: 18),
+                    label: const Text('Save Staff Member', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF059669),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -864,334 +1950,629 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
     );
   }
 
-  Widget _buildSetupPill(String title, bool isDone, String detail) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: isDone ? const Color(0xFFF0FDF4) : const Color(0xFFFFFBEB),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: isDone ? const Color(0xFFBBF7D0) : const Color(0xFFFDE68A)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(isDone ? Icons.check_circle_rounded : Icons.info_outline_rounded, size: 14, color: isDone ? const Color(0xFF059669) : const Color(0xFFD97706)),
-          const SizedBox(width: 6),
-          Text('$title: ', style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
-          Text(detail, style: TextStyle(fontSize: 11.5, color: isDone ? const Color(0xFF065F46) : const Color(0xFF92400E), fontWeight: FontWeight.w600)),
-        ],
-      ),
-    );
-  }
+  void _showEditStaffCategoryModal(StaffCategory cat, InstitutionProvider provider) {
+    final nameCtrl = TextEditingController(text: cat.name);
+    final orderCtrl = TextEditingController(text: cat.order.toString());
+    bool isPub = cat.showPublic;
 
-  Widget _buildQuickActionBtn(String label, IconData icon, Color color, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withOpacity(0.2)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 15, color: color),
-            const SizedBox(width: 8),
-            Text(label, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: color)),
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('Edit Category: ${cat.name}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Category Name *', border: OutlineInputBorder())),
+              const SizedBox(height: 12),
+              TextField(controller: orderCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Display Order', border: OutlineInputBorder())),
+              const SizedBox(height: 12),
+              CheckboxListTile(
+                value: isPub,
+                title: const Text('Public Display', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                onChanged: (v) => setDlg(() => isPub = v ?? true),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () async {
+                final updated = cat.copyWith(
+                  name: nameCtrl.text.trim(),
+                  order: int.tryParse(orderCtrl.text.trim()) ?? cat.order,
+                  showPublic: isPub,
+                );
+                await provider.saveStaffCategory(updated);
+                Navigator.pop(ctx);
+                setState(() {});
+              },
+              child: const Text('Save Changes'),
+            ),
           ],
         ),
       ),
     );
   }
 
-  // 1B. ACADEMIC YEARS
-  Widget _buildAcademicYearsTab(InstitutionProvider provider, dynamic setting) {
-    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  // ========================================================================
+  // 1D. STAFF & MANAGEMENT (#staff-management / staff-management-page)
+  // ========================================================================
+  Widget _buildStaffDirectoryTab(InstitutionProvider provider) {
+    final search = _staffSearchCtrl.text.trim().toLowerCase();
+    final categories = provider.staffCategories;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Current Working Session Banner
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFECFDF5),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFA7F3D0)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(color: const Color(0xFF059669).withOpacity(0.15), shape: BoxShape.circle),
-                  child: const Icon(Icons.verified_rounded, color: Color(0xFF059669), size: 24),
+    bool matches(Staff s) {
+      if (_staffTypeFilter != 'all') {
+        if (_staffTypeFilter.toLowerCase() == 'teacher' && s.type.toLowerCase() != 'teacher' && s.role != 'TEACHER') return false;
+        if (_staffTypeFilter.toLowerCase() == 'management' && s.type.toLowerCase() != 'management' && s.role != 'ADMIN') return false;
+        if (_staffTypeFilter.toLowerCase() != 'teacher' && _staffTypeFilter.toLowerCase() != 'management') {
+          if (s.type.toLowerCase() != _staffTypeFilter.toLowerCase()) return false;
+        }
+      }
+      if (search.isEmpty) return true;
+      final haystack = '${s.name} ${s.designation} ${s.phone} ${s.email} ${s.type}'.toLowerCase();
+      return haystack.contains(search);
+    }
+
+    final activeStaff = provider.staffList.where((s) => s.isActive && matches(s)).toList();
+    final inactiveStaff = provider.staffList.where((s) => !s.isActive && matches(s)).toList();
+
+    // Sort by display order
+    activeStaff.sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
+    inactiveStaff.sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
+
+    final activeTeachers = activeStaff.where((s) => s.type == 'Teacher' || s.role == 'TEACHER').toList();
+    final activeManagement = activeStaff.where((s) => s.type == 'Management' || s.role == 'ADMIN').toList();
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cols = constraints.maxWidth >= 960 ? 3 : (constraints.maxWidth >= 600 ? 2 : 1);
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header Card
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 8, offset: Offset(0, 2))],
                 ),
-                const SizedBox(width: 14),
-                Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Staff & Management', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                            SizedBox(height: 3),
+                            Text('Manage active staff profiles, duty class assignments, and UPI payment accounts.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                          ],
+                        ),
+                        ElevatedButton.icon(
+                          onPressed: () => setState(() {
+                            _currentModuleIndex = 0;
+                            _currentSubIndex = 2; // Jump to Tab 3 (Add Staff)
+                          }),
+                          icon: const Icon(Icons.person_add_alt_1_rounded, size: 16),
+                          label: const Text('Add New Staff', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFECFDF5),
+                            foregroundColor: const Color(0xFF047857),
+                            elevation: 0,
+                            side: const BorderSide(color: Color(0xFFA7F3D0)),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 20),
+
+                    // Filter row
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _staffSearchCtrl,
+                            onChanged: (_) => setState(() {}),
+                            decoration: const InputDecoration(
+                              hintText: 'Filter by name, role, phone or email...',
+                              prefixIcon: Icon(Icons.search, size: 18),
+                              fillColor: Colors.white,
+                              filled: true,
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        SizedBox(
+                          width: 160,
+                          child: DropdownButtonFormField<String>(
+                            value: _staffTypeFilter,
+                            decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, fillColor: Colors.white, filled: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
+                            items: [
+                              const DropdownMenuItem(value: 'all', child: Text('All Types', style: TextStyle(fontSize: 13))),
+                              ...categories.map((c) => DropdownMenuItem(value: c.name, child: Text(c.name, style: const TextStyle(fontSize: 13)))),
+                            ],
+                            onChanged: (v) => setState(() => _staffTypeFilter = v ?? 'all'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Section: Active Teachers
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 10, offset: Offset(0, 4))],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: const [
+                        Icon(Icons.school_rounded, color: Color(0xFF2563EB), size: 20),
+                        SizedBox(width: 8),
+                        Text('Active Teachers', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
+                      ],
+                    ),
+                    const Divider(height: 24, color: Color(0xFFDBEAFE)),
+                    if (activeTeachers.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(20),
+                        child: Text('No active teachers found.', style: TextStyle(fontStyle: FontStyle.italic, color: Color(0xFF64748B))),
+                      )
+                    else
+                      GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: activeTeachers.length,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: cols,
+                          crossAxisSpacing: 14,
+                          mainAxisSpacing: 14,
+                          childAspectRatio: 1.25,
+                        ),
+                        itemBuilder: (ctx, idx) => _buildStaffCard(activeTeachers[idx], provider, true),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Section: Active Management
+              if (activeManagement.isNotEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 10, offset: Offset(0, 4))],
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('ACTIVE WORKING ACADEMIC SESSION', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF065F46), letterSpacing: 0.8)),
-                      const SizedBox(height: 2),
-                      Text(setting.activeAcademicYear, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF064E3B))),
-                      const SizedBox(height: 2),
-                      const Text('All student enrollments, fee structures, mark sheets, and daily attendance default to this session.', style: TextStyle(fontSize: 11.5, color: Color(0xFF047857))),
+                      Row(
+                        children: const [
+                          Icon(Icons.badge_rounded, color: Color(0xFF7C3AED), size: 20),
+                          SizedBox(width: 8),
+                          Text('Active Management', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF5B21B6))),
+                        ],
+                      ),
+                      const Divider(height: 24, color: Color(0xFFE9D5FF)),
+                      GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: activeManagement.length,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: cols,
+                          crossAxisSpacing: 14,
+                          mainAxisSpacing: 14,
+                          childAspectRatio: 1.25,
+                        ),
+                        itemBuilder: (ctx, idx) => _buildStaffCard(activeManagement[idx], provider, true),
+                      ),
                     ],
                   ),
                 ),
+                const SizedBox(height: 20),
               ],
-            ),
-          ),
-          const SizedBox(height: 20),
 
-          // Configure Academic Year Form
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-              boxShadow: AppColors.cardShadow,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Configure Academic Year (YYYY-YYYY)', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                const SizedBox(height: 6),
-                const Text('Specify calendar bounds and working status. Switch working sessions with automatic continuity checks.', style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
-                const SizedBox(height: 14),
-
-                // Quick suggestions
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
-                  children: [
-                    const Text('Auto-Suggest:', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
-                    _buildYearSuggestChip('2025-2026'),
-                    _buildYearSuggestChip('2026-2027'),
-                    _buildYearSuggestChip('2027-2028'),
-                    _buildYearSuggestChip('2028-2029'),
-                  ],
+              // Collapsible Inactive Staff Accordion
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 8, offset: Offset(0, 2))],
                 ),
-                const SizedBox(height: 14),
-
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: ExpansionTile(
+                  leading: const Icon(Icons.person_off_rounded, color: Color(0xFF64748B)),
+                  title: Text(
+                    'View Inactive Staff (${inactiveStaff.length})',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF334155)),
+                  ),
                   children: [
-                    Expanded(
-                      flex: 2,
-                      child: TextField(
-                        controller: _yearLabelCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Academic Year Label *',
-                          hintText: 'e.g. 2026-2027',
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: _yearStartMonth,
-                        decoration: const InputDecoration(labelText: 'Start Month', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 14)),
-                        items: months.map((m) => DropdownMenuItem(value: m, child: Text(m, style: const TextStyle(fontSize: 12.5)))).toList(),
-                        onChanged: (v) => setState(() => _yearStartMonth = v ?? 'June'),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: _yearEndMonth,
-                        decoration: const InputDecoration(labelText: 'End Month', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 14)),
-                        items: months.map((m) => DropdownMenuItem(value: m, child: Text(m, style: const TextStyle(fontSize: 12.5)))).toList(),
-                        onChanged: (v) => setState(() => _yearEndMonth = v ?? 'March'),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: _yearStatus,
-                        decoration: const InputDecoration(labelText: 'Status', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 14)),
-                        items: const [
-                          DropdownMenuItem(value: 'active', child: Text('Active', style: TextStyle(fontSize: 12.5))),
-                          DropdownMenuItem(value: 'current', child: Text('Current Working', style: TextStyle(fontSize: 12.5))),
-                          DropdownMenuItem(value: 'archived', child: Text('Archived', style: TextStyle(fontSize: 12.5))),
-                        ],
-                        onChanged: (v) => setState(() => _yearStatus = v ?? 'active'),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    ElevatedButton.icon(
-                      onPressed: () async {
-                        final val = _yearLabelCtrl.text.trim();
-                        if (RegExp(r'^\d{4}-\d{4}$').hasMatch(val)) {
-                          await provider.addAcademicYear(AcademicYearConfig(
-                            label: val,
-                            startMonth: _yearStartMonth,
-                            endMonth: _yearEndMonth,
-                            status: _yearStatus,
-                          ));
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Academic Year "$val" saved successfully!'), backgroundColor: const Color(0xFF059669)),
-                          );
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Invalid year format! Must be YYYY-YYYY (e.g. 2026-2027)'), backgroundColor: Colors.red),
-                          );
-                        }
-                      },
-                      icon: const Icon(Icons.add_rounded, size: 16),
-                      label: const Text('Save Year'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF059669),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: inactiveStaff.isEmpty
+                          ? const Center(child: Text('No inactive staff profiles.', style: TextStyle(fontStyle: FontStyle.italic, color: Color(0xFF64748B))))
+                          : GridView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: inactiveStaff.length,
+                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: cols,
+                                crossAxisSpacing: 14,
+                                mainAxisSpacing: 14,
+                                childAspectRatio: 1.25,
+                              ),
+                              itemBuilder: (ctx, idx) => _buildStaffCard(inactiveStaff[idx], provider, false),
+                            ),
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // Configured Years List
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Configured Academic Sessions (${provider.academicYears.length})', style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-              const Text('Active session updates student defaults automatically', style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B), fontStyle: FontStyle.italic)),
+              ),
             ],
           ),
-          const SizedBox(height: 10),
+        );
+      },
+    );
+  }
 
-          if (provider.academicYears.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(30),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
-              child: const Center(child: Text('No academic years configured yet. Please configure the first year above.')),
-            )
-          else
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: provider.academicYears.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (ctx, idx) {
-                final y = provider.academicYears[idx];
-                final isCurrent = y.label == setting.activeAcademicYear || y.status == 'current';
-                return Container(
-                  padding: const EdgeInsets.all(14),
+  Widget _buildStaffCard(Staff st, InstitutionProvider provider, bool isActive) {
+    final assignedList = st.assignedClasses.isNotEmpty
+        ? st.assignedClasses
+        : (st.assignedClass.isNotEmpty ? st.assignedClass.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList() : <String>[]);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 6, offset: Offset(0, 2))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Top Row: Avatar, Name, View Button
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: const Color(0xFFE2E8F0),
+                child: Text(
+                  st.name.isNotEmpty ? st.name[0].toUpperCase() : 'U',
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      st.name.toUpperCase(),
+                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5, color: Color(0xFF0F172A)),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      st.designation.isNotEmpty ? st.designation : st.role,
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              InkWell(
+                onTap: () => _showStaffProfilePreviewModal(st),
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: isCurrent ? const Color(0xFF6EE7B7) : const Color(0xFFE2E8F0)),
-                    boxShadow: AppColors.cardShadow,
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFBFDBFE)),
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Row(
-                        children: [
-                          Icon(Icons.calendar_month_rounded, size: 20, color: isCurrent ? const Color(0xFF059669) : const Color(0xFF2563EB)),
-                          const SizedBox(width: 12),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Text(y.label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5, color: Color(0xFF0F172A))),
-                                  const SizedBox(width: 8),
-                                  if (isCurrent)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                      decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(6)),
-                                      child: const Text('CURRENT WORKING YEAR', style: TextStyle(color: Color(0xFF065F46), fontSize: 10, fontWeight: FontWeight.bold)),
-                                    )
-                                  else if (y.status == 'archived')
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                      decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(6)),
-                                      child: const Text('ARCHIVED', style: TextStyle(color: Color(0xFF64748B), fontSize: 10, fontWeight: FontWeight.bold)),
-                                    ),
-                                ],
-                              ),
-                              const SizedBox(height: 2),
-                              Text('Term Period: ${y.startMonth} to ${y.endMonth} • Status: ${y.status.toUpperCase()}', style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
-                            ],
-                          ),
-                        ],
-                      ),
-                      Row(
-                        children: [
-                          if (!isCurrent)
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF2563EB),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                              ),
-                              onPressed: () async {
-                                await provider.setWorkingAcademicYear(y.label);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Active working academic year switched to "${y.label}"!'), backgroundColor: const Color(0xFF059669)),
-                                );
-                              },
-                              child: const Text('Set as Active', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                            ),
-                          const SizedBox(width: 6),
-                          IconButton(
-                            icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF2563EB)),
-                            tooltip: 'Edit Academic Year',
-                            onPressed: () => _showEditAcademicYearModal(y, provider),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                            tooltip: 'Delete Academic Year',
-                            onPressed: () async {
-                              final confirmed = await _confirmAction(
-                                context,
-                                title: 'Delete Academic Year',
-                                message: 'Are you sure you want to delete academic year "${y.label}"? Enrolled student associations and records may be affected.',
-                                confirmLabel: 'Delete Year',
-                              );
-                              if (confirmed) {
-                                await provider.deleteAcademicYear(y.label);
-                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Academic Year "${y.label}" deleted.')));
-                              }
-                            },
-                          ),
-                        ],
-                      ),
+                      Icon(Icons.visibility_outlined, size: 12, color: Color(0xFF2563EB)),
+                      SizedBox(width: 3),
+                      Text('View', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF1D4ED8))),
                     ],
                   ),
-                );
-              },
+                ),
+              ),
+            ],
+          ),
+
+          // Classes Row
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('CLASSES:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B), letterSpacing: 0.5)),
+              const SizedBox(height: 3),
+              if (assignedList.isEmpty)
+                const Text('No classes assigned', style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Color(0xFF94A3B8)))
+              else
+                Wrap(
+                  spacing: 4,
+                  runSpacing: 2,
+                  children: assignedList.map((c) => Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                    decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(4)),
+                    child: Text(c, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+                  )).toList(),
+                ),
+            ],
+          ),
+
+          // Login Permissions Row
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('LOGIN PERMISSIONS:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B), letterSpacing: 0.5)),
+              const SizedBox(height: 3),
+              Wrap(
+                spacing: 5,
+                runSpacing: 2,
+                children: [
+                  _buildPermPill('1. Collection', st.hasCollectionAccess, const Color(0xFF059669), const Color(0xFFECFDF5)),
+                  _buildPermPill('2. Worksheet', st.hasWorksheetAccess, const Color(0xFF0284C7), const Color(0xFFF0F9FF)),
+                  _buildPermPill('3. Result', st.hasResultAccess, const Color(0xFF4F46E5), const Color(0xFFEEF2FF)),
+                ],
+              ),
+            ],
+          ),
+
+          // 5-Action Buttons Row (grid-cols-5)
+          Container(
+            padding: const EdgeInsets.only(top: 8),
+            decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0xFFF1F5F9)))),
+            child: Row(
+              children: [
+                // 1. Delete
+                Expanded(
+                  child: _buildStaffActionBtn(
+                    label: 'Delete',
+                    icon: Icons.delete_outline,
+                    textColor: const Color(0xFFE11D48),
+                    bgColor: const Color(0xFFFFF1F2),
+                    borderColor: const Color(0xFFFECDD3),
+                    onTap: () async {
+                      final confirmed = await _confirmAction(
+                        context,
+                        title: 'Delete Staff',
+                        message: 'Permanently remove "${st.name}"?',
+                        confirmLabel: 'Delete',
+                      );
+                      if (confirmed) {
+                        await provider.deleteStaff(st.id);
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Staff member "${st.name}" deleted.')));
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 4),
+                // 2. Deactive / Active
+                Expanded(
+                  child: _buildStaffActionBtn(
+                    label: isActive ? 'Deactive' : 'Active',
+                    icon: isActive ? Icons.person_off_outlined : Icons.person_outline,
+                    textColor: isActive ? const Color(0xFFD97706) : const Color(0xFF059669),
+                    bgColor: isActive ? const Color(0xFFFFFBEB) : const Color(0xFFECFDF5),
+                    borderColor: isActive ? const Color(0xFFFDE68A) : const Color(0xFFA7F3D0),
+                    onTap: () async {
+                      await provider.toggleStaffActive(st.id);
+                      setState(() {});
+                    },
+                  ),
+                ),
+                const SizedBox(width: 4),
+                // 3. Login
+                Expanded(
+                  child: _buildStaffActionBtn(
+                    label: 'Login',
+                    icon: Icons.vpn_key_outlined,
+                    textColor: const Color(0xFF7C3AED),
+                    bgColor: const Color(0xFFF5F3FF),
+                    borderColor: const Color(0xFFDDD6FE),
+                    onTap: () => _showStaffLoginModal(st),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                // 4. Duty & ...
+                Expanded(
+                  child: _buildStaffActionBtn(
+                    label: 'Duty & ...',
+                    icon: Icons.school_outlined,
+                    textColor: const Color(0xFF4F46E5),
+                    bgColor: const Color(0xFFEEF2FF),
+                    borderColor: const Color(0xFFC7D2FE),
+                    onTap: () => _showDutyModal(st, provider),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                // 5. Edit
+                Expanded(
+                  child: _buildStaffActionBtn(
+                    label: 'Edit',
+                    icon: Icons.edit_outlined,
+                    textColor: const Color(0xFF2563EB),
+                    bgColor: const Color(0xFFEFF6FF),
+                    borderColor: const Color(0xFFBFDBFE),
+                    onTap: () => _showEditStaffModal(st, provider),
+                  ),
+                ),
+              ],
             ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildYearSuggestChip(String year) {
-    return InkWell(
-      onTap: () => setState(() => _yearLabelCtrl.text = year),
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(6), border: Border.all(color: const Color(0xFFCBD5E1))),
-        child: Text(year, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+  Widget _buildPermPill(String text, bool active, Color color, Color bg) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+      decoration: BoxDecoration(
+        color: active ? bg : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: active ? color.withOpacity(0.3) : const Color(0xFFE2E8F0)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 9.5,
+          fontWeight: FontWeight.bold,
+          color: active ? color : const Color(0xFF94A3B8),
+        ),
       ),
     );
   }
+
+  Widget _buildStaffActionBtn({
+    required String label,
+    required IconData icon,
+    required Color textColor,
+    required Color bgColor,
+    required Color borderColor,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: borderColor),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 14, color: textColor),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: textColor),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(label, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+          ),
+          Expanded(
+            child: Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showStaffProfilePreviewModal(Staff st) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            CircleAvatar(radius: 18, child: Text(st.name.isNotEmpty ? st.name[0].toUpperCase() : 'U')),
+            const SizedBox(width: 10),
+            Expanded(child: Text(st.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildInfoRow('Role & Category', '${st.type} (${st.role})'),
+            _buildInfoRow('Designation', st.designation),
+            _buildInfoRow('Phone', st.phone.isNotEmpty ? st.phone : 'Not Provided'),
+            _buildInfoRow('Email', st.email.isNotEmpty ? st.email : 'Not Provided'),
+            _buildInfoRow('Assigned Classes', st.assignedClasses.isNotEmpty ? st.assignedClasses.join(', ') : (st.assignedClass.isNotEmpty ? st.assignedClass : 'None')),
+            _buildInfoRow('UPI Cashier VPA', st.upiId.isNotEmpty ? st.upiId : 'None'),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+        ],
+      ),
+    );
+  }
+
+  void _showStaffLoginModal(Staff st) {
+    final emailCtrl = TextEditingController(text: st.email);
+    final passCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Login Credentials: ${st.name}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: emailCtrl, decoration: const InputDecoration(labelText: 'Login Email / Username', border: OutlineInputBorder())),
+            const SizedBox(height: 12),
+            TextField(controller: passCtrl, obscureText: true, decoration: const InputDecoration(labelText: 'Reset Portal Password', border: OutlineInputBorder(), hintText: 'Enter new password')),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Login credentials updated!'), backgroundColor: Color(0xFF059669)));
+            },
+            child: const Text('Save Credentials'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- MODALS FOR ACADEMIC YEARS & STAFF ---
 
   void _showEditAcademicYearModal(AcademicYearConfig y, InstitutionProvider provider) {
     String startMonth = y.startMonth;
@@ -1261,279 +2642,6 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
     );
   }
 
-  // 1C. STAFF DIRECTORY
-  Widget _buildStaffDirectoryTab(InstitutionProvider provider) {
-    final query = _staffSearchCtrl.text.trim().toLowerCase();
-    final filtered = provider.staffList.where((st) {
-      if (_staffRoleFilter != 'ALL' && st.role != _staffRoleFilter) return false;
-      if (query.isNotEmpty) {
-        final m = st.name.toLowerCase().contains(query) ||
-            st.phone.contains(query) ||
-            st.email.toLowerCase().contains(query) ||
-            st.designation.toLowerCase().contains(query);
-        if (!m) return false;
-      }
-      return true;
-    }).toList();
-
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          // Toolbar Card
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-              boxShadow: AppColors.cardShadow,
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: TextField(
-                    controller: _staffSearchCtrl,
-                    decoration: const InputDecoration(
-                      hintText: 'Search staff by name, phone, designation...',
-                      prefixIcon: Icon(Icons.search, size: 18),
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    ),
-                    onChanged: (_) => setState(() {}),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  flex: 2,
-                  child: DropdownButtonFormField<String>(
-                    value: _staffRoleFilter,
-                    decoration: const InputDecoration(
-                      labelText: 'Role Filter',
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: 'ALL', child: Text('All Roles', style: TextStyle(fontSize: 12.5))),
-                      DropdownMenuItem(value: 'TEACHER', child: Text('Teachers / Ustad', style: TextStyle(fontSize: 12.5))),
-                      DropdownMenuItem(value: 'ADMIN', child: Text('Administrators', style: TextStyle(fontSize: 12.5))),
-                      DropdownMenuItem(value: 'COLLECTOR', child: Text('Cashier / Collectors', style: TextStyle(fontSize: 12.5))),
-                    ],
-                    onChanged: (v) => setState(() => _staffRoleFilter = v ?? 'ALL'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                ElevatedButton.icon(
-                  onPressed: () => setState(() {
-                    _currentModuleIndex = 0;
-                    _currentSubIndex = 3;
-                  }),
-                  icon: const Icon(Icons.person_add_rounded, size: 16),
-                  label: const Text('Add Staff'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2563EB),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // Staff List View
-          Expanded(
-            child: filtered.isEmpty
-                ? Container(
-                    padding: const EdgeInsets.all(40),
-                    alignment: Alignment.center,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.badge_outlined, size: 48, color: Color(0xFF94A3B8)),
-                        const SizedBox(height: 12),
-                        const Text('No faculty or staff matching your query.', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
-                        const SizedBox(height: 4),
-                        const Text('Adjust your role filter or register a new staff member.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                      ],
-                    ),
-                  )
-                : ListView.separated(
-                    itemCount: filtered.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (ctx, idx) {
-                      final st = filtered[idx];
-                      final roleColor = st.role == 'ADMIN'
-                          ? const Color(0xFFD97706)
-                          : (st.role == 'COLLECTOR' ? const Color(0xFF059669) : const Color(0xFF2563EB));
-                      final assignedList = st.assignedClasses.isNotEmpty
-                          ? st.assignedClasses
-                          : (st.assignedClass.isNotEmpty ? st.assignedClass.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList() : <String>[]);
-
-                      return Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                          boxShadow: AppColors.cardShadow,
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            CircleAvatar(
-                              radius: 24,
-                              backgroundColor: roleColor.withOpacity(0.12),
-                              child: Text(
-                                st.name.isNotEmpty ? st.name[0].toUpperCase() : 'U',
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: roleColor),
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Text(st.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5, color: Color(0xFF0F172A))),
-                                      const SizedBox(width: 8),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                        decoration: BoxDecoration(color: roleColor.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
-                                        child: Text(st.role, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: roleColor)),
-                                      ),
-                                      if (st.designation.isNotEmpty) ...[
-                                        const SizedBox(width: 6),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                          decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(6)),
-                                          child: Text(st.designation, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
-                                        ),
-                                      ],
-                                      if (st.samasthaRegNo.isNotEmpty) ...[
-                                        const SizedBox(width: 6),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                          decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(6)),
-                                          child: Text('Reg: ${st.samasthaRegNo}', style: const TextStyle(fontSize: 10, color: Color(0xFF1D4ED8), fontWeight: FontWeight.w600)),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.phone_rounded, size: 13, color: Color(0xFF64748B)),
-                                      const SizedBox(width: 4),
-                                      Text(st.phone.isNotEmpty ? st.phone : 'No Phone', style: const TextStyle(fontSize: 11.5, color: Color(0xFF475569))),
-                                      const SizedBox(width: 14),
-                                      const Icon(Icons.email_outlined, size: 13, color: Color(0xFF64748B)),
-                                      const SizedBox(width: 4),
-                                      Text(st.email.isNotEmpty ? st.email : 'No Email', style: const TextStyle(fontSize: 11.5, color: Color(0xFF475569))),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-
-                                  // Assigned Classes Wrap
-                                  Row(
-                                    crossAxisAlignment: CrossAxisAlignment.center,
-                                    children: [
-                                      const Text('Assigned: ', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
-                                      if (assignedList.isEmpty)
-                                        const Text('All Classes', style: TextStyle(fontSize: 11.5, color: Color(0xFF0F172A), fontWeight: FontWeight.w600))
-                                      else
-                                        Wrap(
-                                          spacing: 6,
-                                          runSpacing: 4,
-                                          children: assignedList.map((c) => Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(4), border: Border.all(color: const Color(0xFFBFDBFE))),
-                                            child: Text(c, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF1E40AF))),
-                                          )).toList(),
-                                        ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-
-                                  // 4-Portal Access Badges
-                                  Wrap(
-                                    spacing: 6,
-                                    runSpacing: 4,
-                                    children: [
-                                      _buildAccessBadge('Fees', st.hasCollectionAccess, const Color(0xFF059669)),
-                                      _buildAccessBadge('Worksheet', st.hasWorksheetAccess, const Color(0xFF2563EB)),
-                                      _buildAccessBadge('Results', st.hasResultAccess, const Color(0xFF7C3AED)),
-                                      _buildAccessBadge('Admin', st.hasAdminAccess, const Color(0xFFD97706)),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            // Actions
-                            Column(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit_outlined, size: 19, color: Color(0xFF2563EB)),
-                                  tooltip: 'Edit Profile & Portal Access',
-                                  onPressed: () => _showEditStaffModal(st, provider),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.assignment_ind_rounded, size: 19, color: Color(0xFF059669)),
-                                  tooltip: 'Assign Duty Classes & UPI Account',
-                                  onPressed: () => _showDutyModal(st, provider),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete_outline, size: 19, color: Colors.red),
-                                  tooltip: 'Delete Staff Member',
-                                  onPressed: () async {
-                                    final confirmed = await _confirmAction(
-                                      context,
-                                      title: 'Delete Staff Member',
-                                      message: 'Are you sure you want to permanently remove faculty member "${st.name}"? All assigned access and login credentials will be revoked.',
-                                      confirmLabel: 'Delete Staff',
-                                    );
-                                    if (confirmed) {
-                                      await provider.deleteStaff(st.id);
-                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Staff member "${st.name}" deleted.')));
-                                    }
-                                  },
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAccessBadge(String label, bool isGranted, Color activeColor) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-      decoration: BoxDecoration(
-        color: isGranted ? activeColor.withOpacity(0.1) : const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: isGranted ? activeColor.withOpacity(0.3) : const Color(0xFFCBD5E1)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(isGranted ? Icons.check_circle_rounded : Icons.cancel_outlined, size: 11, color: isGranted ? activeColor : const Color(0xFF94A3B8)),
-          const SizedBox(width: 4),
-          Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isGranted ? activeColor : const Color(0xFF94A3B8))),
-        ],
-      ),
-    );
-  }
-
   void _showEditStaffModal(Staff st, InstitutionProvider provider) {
     final nameCtrl = TextEditingController(text: st.name);
     final desigCtrl = TextEditingController(text: st.designation);
@@ -1541,6 +2649,7 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
     final phoneCtrl = TextEditingController(text: st.phone);
     final emailCtrl = TextEditingController(text: st.email);
     String role = st.role;
+    String staffType = st.type;
     bool canCollect = st.hasCollectionAccess;
     bool canWorksheet = st.hasWorksheetAccess;
     bool canResults = st.hasResultAccess;
@@ -1566,6 +2675,13 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Full Name *', border: OutlineInputBorder())),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    value: provider.staffCategories.any((c) => c.name == staffType) ? staffType : (provider.staffCategories.isNotEmpty ? provider.staffCategories.first.name : 'Teacher'),
+                    decoration: const InputDecoration(labelText: 'Staff Category *', border: OutlineInputBorder()),
+                    items: provider.staffCategories.map((c) => DropdownMenuItem(value: c.name, child: Text(c.name))).toList(),
+                    onChanged: (val) => setLocal(() => staffType = val ?? 'Teacher'),
+                  ),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
                     value: ['TEACHER', 'ADMIN', 'COLLECTOR'].contains(role) ? role : 'TEACHER',
@@ -1646,6 +2762,7 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                   hasWorksheetAccess: canWorksheet,
                   hasResultAccess: canResults,
                   hasAdminAccess: canAdmin,
+                  type: staffType,
                 );
                 await provider.updateStaff(updated);
                 Navigator.pop(ctx);
@@ -1745,285 +2862,6 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
     );
   }
 
-  // 1D. ADD STAFF & CATEGORIES
-  Widget _buildAddStaffTab(InstitutionProvider provider) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-          boxShadow: AppColors.cardShadow,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: const [
-                    Icon(Icons.person_add_alt_1_rounded, color: Color(0xFF2563EB), size: 22),
-                    SizedBox(width: 8),
-                    Text('Register Faculty / Staff Member', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                  ],
-                ),
-                TextButton.icon(
-                  onPressed: () => setState(() {
-                    _currentModuleIndex = 0;
-                    _currentSubIndex = 2;
-                  }),
-                  icon: const Icon(Icons.arrow_back_rounded, size: 16),
-                  label: const Text('Back to Directory'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            const Text('Configure staff profile, duty classes, and granular 4-portal access permissions.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-            const Divider(height: 24),
-
-            // Two-column layout
-            LayoutBuilder(
-              builder: (ctx, constraints) {
-                final isWide = constraints.maxWidth >= 760;
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Left Column: Identity & Details
-                    Expanded(
-                      flex: isWide ? 1 : 1,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('1. Staff Profile & Contact Information', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                          const SizedBox(height: 12),
-
-                          TextField(
-                            controller: _addStaffNameCtrl,
-                            decoration: const InputDecoration(labelText: 'Full Staff Name *', hintText: 'e.g. USTAD AHMAD K', border: OutlineInputBorder()),
-                          ),
-                          const SizedBox(height: 12),
-
-                          Row(
-                            children: [
-                              Expanded(
-                                child: DropdownButtonFormField<String>(
-                                  value: _addStaffRole,
-                                  decoration: const InputDecoration(labelText: 'Role *', border: OutlineInputBorder()),
-                                  items: const [
-                                    DropdownMenuItem(value: 'TEACHER', child: Text('Teacher / Faculty')),
-                                    DropdownMenuItem(value: 'ADMIN', child: Text('Administrator')),
-                                    DropdownMenuItem(value: 'COLLECTOR', child: Text('Cashier / Fee Collector')),
-                                  ],
-                                  onChanged: (val) => setState(() => _addStaffRole = val ?? 'TEACHER'),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: TextField(
-                                  controller: _addStaffDesigCtrl,
-                                  decoration: const InputDecoration(labelText: 'Designation', hintText: 'e.g. Swadar, Headmaster', border: OutlineInputBorder()),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: _addStaffPhoneCtrl,
-                                  keyboardType: TextInputType.phone,
-                                  decoration: const InputDecoration(labelText: 'Phone / WhatsApp *', hintText: 'e.g. 9876543210', border: OutlineInputBorder()),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: TextField(
-                                  controller: _addStaffEmailCtrl,
-                                  keyboardType: TextInputType.emailAddress,
-                                  decoration: const InputDecoration(labelText: 'Email Address *', hintText: 'e.g. staff@school.com', border: OutlineInputBorder()),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-
-                          TextField(
-                            controller: _addStaffSamasthaCtrl,
-                            decoration: const InputDecoration(labelText: 'Samastha / Board Registration # (Optional)', hintText: 'e.g. REG-88321', border: OutlineInputBorder()),
-                          ),
-                          const SizedBox(height: 16),
-
-                          const Text('Optional UPI Account Details', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Expanded(child: TextField(controller: _addStaffUpiAccCtrl, decoration: const InputDecoration(labelText: 'UPI Account Holder Name', border: OutlineInputBorder()))),
-                              const SizedBox(width: 10),
-                              Expanded(child: TextField(controller: _addStaffUpiIdCtrl, decoration: const InputDecoration(labelText: 'UPI ID (VPA)', border: OutlineInputBorder()))),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 24),
-
-                    // Right Column: Assigned Classes & 4-Portal Access
-                    Expanded(
-                      flex: isWide ? 1 : 1,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('2. Assigned Duty Classes', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                          const SizedBox(height: 6),
-                          const Text('Select classes where this teacher holds academic jurisdiction.', style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
-                          const SizedBox(height: 10),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: provider.classes.map((c) {
-                              final isSel = _addStaffAssignedClasses.contains(c);
-                              return FilterChip(
-                                selected: isSel,
-                                selectedColor: const Color(0xFFDBEAFE),
-                                checkmarkColor: const Color(0xFF1D4ED8),
-                                label: Text(c, style: TextStyle(fontSize: 12, fontWeight: isSel ? FontWeight.bold : FontWeight.normal, color: isSel ? const Color(0xFF1E40AF) : const Color(0xFF334155))),
-                                onSelected: (val) {
-                                  setState(() {
-                                    if (val) _addStaffAssignedClasses.add(c); else _addStaffAssignedClasses.remove(c);
-                                  });
-                                },
-                              );
-                            }).toList(),
-                          ),
-                          const SizedBox(height: 20),
-
-                          const Text('3. 4-Portal Access Security Permissions', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
-                          const SizedBox(height: 6),
-                          const Text('Granularly grant or restrict portal access to this staff member.', style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
-                          const SizedBox(height: 10),
-
-                          CheckboxListTile(
-                            value: _addStaffCanCollect,
-                            dense: true,
-                            onChanged: (v) => setState(() => _addStaffCanCollect = v ?? true),
-                            title: const Text('1. Fee Collection & Receipts', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
-                            subtitle: const Text('Collect fees, print receipts, view daily registers', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                          ),
-                          CheckboxListTile(
-                            value: _addStaffCanWorksheet,
-                            dense: true,
-                            onChanged: (v) => setState(() => _addStaffCanWorksheet = v ?? true),
-                            title: const Text('2. Worksheet & Attendance Portal', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
-                            subtitle: const Text('Mark daily attendance, generate class registers', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                          ),
-                          CheckboxListTile(
-                            value: _addStaffCanResults,
-                            dense: true,
-                            onChanged: (v) => setState(() => _addStaffCanResults = v ?? false),
-                            title: const Text('3. Result Management System', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
-                            subtitle: const Text('Enter marks, grade exams, promote cohorts', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                          ),
-                          CheckboxListTile(
-                            value: _addStaffCanAdmin,
-                            dense: true,
-                            onChanged: (v) => setState(() => _addStaffCanAdmin = v ?? false),
-                            title: const Text('4. Admin Command Center', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
-                            subtitle: const Text('Full institution settings, student management, security', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                          ),
-                          if (_addStaffCanAdmin)
-                            Padding(
-                              padding: const EdgeInsets.only(left: 20),
-                              child: CheckboxListTile(
-                                value: _addStaffActAsSuperAdmin,
-                                dense: true,
-                                onChanged: (v) => setState(() => _addStaffActAsSuperAdmin = v ?? false),
-                                title: const Text('Super Administrator Privileges', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFD97706))),
-                                subtitle: const Text('Unlocks master credentials, cloud restores, audit wipes', style: TextStyle(fontSize: 10.5, color: Color(0xFFB45309))),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-            const Divider(height: 28),
-
-            Align(
-              alignment: Alignment.centerRight,
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  final name = _addStaffNameCtrl.text.trim();
-                  final phone = _addStaffPhoneCtrl.text.trim();
-                  if (name.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter Staff Name!'), backgroundColor: Colors.red));
-                    return;
-                  }
-                  if (phone.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter Phone Number!'), backgroundColor: Colors.red));
-                    return;
-                  }
-
-                  final newStaff = Staff(
-                    id: 'st_${DateTime.now().millisecondsSinceEpoch}',
-                    name: name,
-                    role: _addStaffRole,
-                    designation: _addStaffDesigCtrl.text.trim(),
-                    samasthaRegNo: _addStaffSamasthaCtrl.text.trim(),
-                    phone: phone,
-                    email: _addStaffEmailCtrl.text.trim(),
-                    assignedClass: _addStaffAssignedClasses.join(', '),
-                    assignedClasses: _addStaffAssignedClasses.toList(),
-                    upiAccountName: _addStaffUpiAccCtrl.text.trim(),
-                    upiId: _addStaffUpiIdCtrl.text.trim(),
-                    hasCollectionAccess: _addStaffCanCollect,
-                    hasWorksheetAccess: _addStaffCanWorksheet,
-                    hasResultAccess: _addStaffCanResults,
-                    hasAdminAccess: _addStaffCanAdmin,
-                  );
-
-                  await provider.addStaff(newStaff);
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Faculty member "${newStaff.name}" registered successfully!'), backgroundColor: const Color(0xFF059669)),
-                  );
-
-                  // Reset form
-                  _addStaffNameCtrl.clear();
-                  _addStaffPhoneCtrl.clear();
-                  _addStaffEmailCtrl.clear();
-                  _addStaffSamasthaCtrl.clear();
-                  _addStaffUpiAccCtrl.clear();
-                  _addStaffUpiIdCtrl.clear();
-                  _addStaffAssignedClasses.clear();
-
-                  // Switch back to Directory
-                  setState(() {
-                    _currentModuleIndex = 0;
-                    _currentSubIndex = 2;
-                  });
-                },
-                icon: const Icon(Icons.person_add_rounded, size: 16),
-                label: const Text('Register Staff Member'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2563EB),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   // ========================================================================
   // MODULE 2: STUDENT ADMINISTRATION & ENROLLMENT

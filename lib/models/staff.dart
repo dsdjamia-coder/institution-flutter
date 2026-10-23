@@ -3,6 +3,9 @@ class Staff {
   final String name;
   final String role; // 'ADMIN', 'TEACHER', 'COLLECTOR', 'OPERATOR'
   final String designation; // 'SWADAR', 'TEACHER', 'HEADMASTER', etc.
+  final String type; // 'Teacher', 'Management', or custom category
+  final int displayOrder;
+  final bool isActive;
   final String phone;
   final String email;
   final String photoUrl;
@@ -23,6 +26,9 @@ class Staff {
     required this.name,
     this.role = 'TEACHER',
     this.designation = 'TEACHER',
+    this.type = 'Teacher',
+    this.displayOrder = 999,
+    this.isActive = true,
     this.phone = '',
     this.email = '',
     this.photoUrl = '',
@@ -40,11 +46,17 @@ class Staff {
   });
 
   factory Staff.fromMap(Map<String, dynamic> map, String docId) {
+    final rawRole = map['role']?.toString() ?? 'TEACHER';
+    final rawType = map['type']?.toString() ?? (rawRole.toUpperCase() == 'ADMIN' ? 'Management' : 'Teacher');
+
     return Staff(
       id: docId,
       name: map['name']?.toString() ?? '',
-      role: map['role']?.toString() ?? 'TEACHER',
-      designation: map['designation']?.toString() ?? (map['role']?.toString() ?? 'TEACHER'),
+      role: rawRole,
+      designation: map['designation']?.toString() ?? rawRole,
+      type: rawType,
+      displayOrder: int.tryParse(map['displayOrder']?.toString() ?? '') ?? 999,
+      isActive: map['isActive'] != false && map['active'] != false && map['status'] != 'inactive',
       phone: map['phone']?.toString() ?? '',
       email: map['email']?.toString() ?? '',
       photoUrl: map['photoUrl']?.toString() ?? '',
@@ -62,7 +74,7 @@ class Staff {
       hasCollectionAccess: map['hasCollectionAccess'] == true || map['collection'] == true,
       hasResultAccess: map['hasResultAccess'] == true || map['result'] == true,
       hasWorksheetAccess: map['hasWorksheetAccess'] == true || map['worksheet'] == true,
-      hasAdminAccess: map['hasAdminAccess'] == true || map['admin'] == true || map['role'] == 'ADMIN',
+      hasAdminAccess: map['hasAdminAccess'] == true || map['admin'] == true || rawRole == 'ADMIN',
     );
   }
 
@@ -71,6 +83,10 @@ class Staff {
       'name': name,
       'role': role,
       'designation': designation,
+      'type': type,
+      'displayOrder': displayOrder,
+      'isActive': isActive,
+      'active': isActive,
       'phone': phone,
       'email': email,
       'photoUrl': photoUrl,
@@ -93,6 +109,9 @@ class Staff {
     String? name,
     String? role,
     String? designation,
+    String? type,
+    int? displayOrder,
+    bool? isActive,
     String? phone,
     String? email,
     String? photoUrl,
@@ -113,6 +132,9 @@ class Staff {
       name: name ?? this.name,
       role: role ?? this.role,
       designation: designation ?? this.designation,
+      type: type ?? this.type,
+      displayOrder: displayOrder ?? this.displayOrder,
+      isActive: isActive ?? this.isActive,
       phone: phone ?? this.phone,
       email: email ?? this.email,
       photoUrl: photoUrl ?? this.photoUrl,

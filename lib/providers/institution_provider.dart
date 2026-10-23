@@ -11,6 +11,7 @@ import '../models/student_group.dart';
 import '../models/fee_concession.dart';
 import '../models/custom_fee_item.dart';
 import '../models/audit_log.dart';
+import '../models/staff_category.dart';
 import '../services/firestore_service.dart';
 import '../services/duplicate_guard.dart';
 
@@ -39,6 +40,9 @@ class InstitutionProvider extends ChangeNotifier {
 
   List<Staff> _staffList = [];
   List<Staff> get staffList => _staffList;
+
+  List<StaffCategory> _staffCategories = [];
+  List<StaffCategory> get staffCategories => _staffCategories;
 
   List<ExamResult> _examResults = [];
   List<ExamResult> get examResults => _examResults;
@@ -83,6 +87,7 @@ class InstitutionProvider extends ChangeNotifier {
   int get totalGirls =>
       _students.where((s) => s.status.toLowerCase() == 'active' && s.gender.toLowerCase() == 'female').length;
   int get totalStaff => _staffList.length;
+  int get activeStaffCount => _staffList.where((s) => s.isActive).length;
 
   // Filtered lists for strict portal isolation
   List<Student> get activeStudents =>
@@ -126,6 +131,7 @@ class InstitutionProvider extends ChangeNotifier {
       _students = await _firestoreService.fetchStudents();
       _payments = await _firestoreService.fetchPayments();
       _staffList = await _firestoreService.fetchStaff();
+      _staffCategories = await _firestoreService.fetchStaffCategories();
       _notices = await _firestoreService.fetchNotices();
       _gallery = await _firestoreService.fetchGallery();
       _academicYears = await _firestoreService.fetchAcademicYears();
@@ -453,6 +459,36 @@ class InstitutionProvider extends ChangeNotifier {
     _staffList.removeWhere((s) => s.id == staffId);
     notifyListeners();
     await _firestoreService.deleteStaff(staffId);
+  }
+
+  Future<void> toggleStaffActive(String staffId) async {
+    final idx = _staffList.indexWhere((s) => s.id == staffId);
+    if (idx != -1) {
+      final updated = _staffList[idx].copyWith(isActive: !_staffList[idx].isActive);
+      _staffList[idx] = updated;
+      notifyListeners();
+      await _firestoreService.saveStaff(updated);
+      await addAuditLog('staff', 'TOGGLE_STAFF_STATUS', '${updated.name} marked as ${updated.isActive ? "Active" : "Inactive"}');
+    }
+  }
+
+  Future<void> saveStaffCategory(StaffCategory category) async {
+    final idx = _staffCategories.indexWhere((c) => c.id == category.id);
+    if (idx != -1) {
+      _staffCategories[idx] = category;
+    } else {
+      _staffCategories.add(category);
+    }
+    notifyListeners();
+    await _firestoreService.saveStaffCategories(_staffCategories);
+    await addAuditLog('staff', 'SAVE_CATEGORY', 'Saved staff category "${category.name}"');
+  }
+
+  Future<void> deleteStaffCategory(String id) async {
+    _staffCategories.removeWhere((c) => c.id == id && !c.isCore);
+    notifyListeners();
+    await _firestoreService.saveStaffCategories(_staffCategories);
+    await addAuditLog('staff', 'DELETE_CATEGORY', 'Deleted staff category #$id');
   }
 
   // ==================== STUDENTS ====================

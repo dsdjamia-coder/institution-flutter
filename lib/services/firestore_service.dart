@@ -14,6 +14,7 @@ import '../models/student_group.dart';
 import '../models/fee_concession.dart';
 import '../models/custom_fee_item.dart';
 import '../models/audit_log.dart';
+import '../models/staff_category.dart';
 
 /// Firebase Firestore Communication Service
 class FirestoreService {
@@ -25,6 +26,7 @@ class FirestoreService {
   final List<Student> _cachedStudents = [];
   final List<Payment> _cachedPayments = [];
   final List<Staff> _cachedStaff = [];
+  final List<StaffCategory> _cachedStaffCategories = [];
   final List<ExamResult> _cachedResults = [];
   final List<Notice> _cachedNotices = [];
   final List<GalleryItem> _cachedGallery = [];
@@ -283,19 +285,8 @@ class FirestoreService {
   }
 
   Future<Staff> createStaff(Staff staff) async {
-    final docId = 'STF_${DateTime.now().millisecondsSinceEpoch}';
-    final newStaff = Staff(
-      id: docId,
-      name: staff.name,
-      role: staff.role,
-      phone: staff.phone,
-      email: staff.email,
-      assignedClass: staff.assignedClass,
-      hasCollectionAccess: staff.hasCollectionAccess,
-      hasResultAccess: staff.hasResultAccess,
-      hasWorksheetAccess: staff.hasWorksheetAccess,
-      hasAdminAccess: staff.hasAdminAccess,
-    );
+    final docId = staff.id.isNotEmpty ? staff.id : 'STF_${DateTime.now().millisecondsSinceEpoch}';
+    final newStaff = staff.copyWith(id: docId);
     _cachedStaff.add(newStaff);
 
     try {
@@ -338,6 +329,56 @@ class FirestoreService {
       return res.statusCode == 200;
     } catch (e) {
       debugPrint('[FirestoreService] deleteStaff notice: $e');
+      return true;
+    }
+  }
+
+  // ==================== STAFF CATEGORIES ====================
+  Future<List<StaffCategory>> fetchStaffCategories() async {
+    if (_cachedStaffCategories.isNotEmpty) return _cachedStaffCategories;
+    try {
+      final url = Uri.parse('$baseUrl/settings/directoryCategories');
+      final res = await http.get(url);
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final fields = _decodeFirestoreFields(data['fields'] ?? {});
+        final raw = fields['categories'] ?? fields['list'];
+        if (raw is List) {
+          _cachedStaffCategories.clear();
+          for (final item in raw) {
+            if (item is Map<String, dynamic>) {
+              _cachedStaffCategories.add(StaffCategory.fromMap(item));
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[FirestoreService] fetchStaffCategories notice: $e');
+    }
+
+    if (_cachedStaffCategories.isEmpty) {
+      _cachedStaffCategories.addAll([
+        StaffCategory(id: 'Teacher', name: 'Teacher', order: 1, showPublic: true, isCore: true),
+        StaffCategory(id: 'Management', name: 'Management', order: 2, showPublic: true, isCore: true),
+      ]);
+    }
+    return _cachedStaffCategories;
+  }
+
+  Future<bool> saveStaffCategories(List<StaffCategory> categories) async {
+    _cachedStaffCategories
+      ..clear()
+      ..addAll(categories);
+    try {
+      final url = Uri.parse('$baseUrl/settings/directoryCategories');
+      final listMaps = categories.map((c) => c.toMap()).toList();
+      final body = jsonEncode({
+        'fields': _encodeFirestoreFields({'categories': listMaps}),
+      });
+      final res = await http.patch(url, body: body, headers: {'Content-Type': 'application/json'});
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('[FirestoreService] saveStaffCategories notice: $e');
       return true;
     }
   }
