@@ -637,7 +637,7 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
             children: [
               // Top Institutional Badge Card
               Container(
-                margin: const EdgeInsets.bottom: 16,
+                margin: const EdgeInsets.only(bottom: 16),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -1946,6 +1946,47 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSwitchPill(String title, bool val, ValueChanged<bool> onChanged) {
+    return InkWell(
+      onTap: () => onChanged(!val),
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: val ? const Color(0xFFEFF6FF) : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: val ? const Color(0xFF2563EB) : const Color(0xFFCBD5E1),
+            width: val ? 1.5 : 1.0,
+          ),
+          boxShadow: const [
+            BoxShadow(color: Color(0x050F172A), blurRadius: 4, offset: Offset(0, 1)),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              val ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+              color: val ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: val ? FontWeight.bold : FontWeight.w600,
+                color: val ? const Color(0xFF1E3A8A) : const Color(0xFF334155),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
